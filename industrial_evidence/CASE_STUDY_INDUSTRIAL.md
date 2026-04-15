@@ -38,6 +38,8 @@ The success of this Industrial Stress Test serves as a definitive **Proof of Con
 
 We are not seeking profit; we are seeking to prove that our technical intuition—the "Lom RAG" approach—is the correct foundation for the next generation of industrial-grade AI agents.
 
+This repository is provided as an open-source foundation. You are free to take this architecture, adapt it, integrate it with your enterprise's complex RBAC (Active Directory, OAuth, etc.), and scale it for your own needs. 
+
 **The theory is proven. The implementation is yours.**
 
 ---

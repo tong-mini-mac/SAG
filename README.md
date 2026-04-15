@@ -26,7 +26,7 @@ I am not looking for profit or a commercial software license. My only objective 
 
 **The theory is proven. The foundation is here.**
 
-This repository is an open-source research artifact. You are free to take this architecture, adapt it, integrate it with your enterprise's complex systems (Active Directory, OAuth, etc.), and scale it for your own needs. 
+This repository is provided as an open-source foundation. You are free to take this architecture, adapt it, integrate it with your enterprise's complex RBAC (Active Directory, OAuth, etc.), and scale it for your own needs. 
 
 *The framework is public. The proof is undeniable. The implementation is now yours.*
 
