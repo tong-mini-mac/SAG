@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="docs/img/cover.png" width="100%" alt="RAG-Destroyer Cover">
+  <img src="docs/img/architecture.png" width="100%" alt="RAG-Destroyer: Obsidian Graph x Subset Architecture">
   <h1>🏛️ RAG-Destroyer: The Zero-Vector-DB Architecture</h1>
   <p><b>Deterministic Knowledge Retrieval for the LLM OS Era</b></p>
 </div>
