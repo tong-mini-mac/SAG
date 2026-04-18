@@ -54,14 +54,59 @@ class SearchWorker:
                         "relevance": relevance,
                         "department": subset,
                         "tags": doc["tags"],
-                        "summary": doc["summary"]
+                        "summary": doc["summary"],
+                        "doc_id": doc.get("doc_id", "N/A"),
                     })
         
         return results
 
     def _slow_search(self, keyword, allowed_subsets):
-        """Fallback search logic (the original disk crawler)."""
-        # (Keeping original logic as a fallback)
+        """Fallback: walk markdown vault when _SEARCH_CACHE.json is missing."""
         results = []
-        # ... (rest of old search logic)
+        keyword = keyword.lower()
+        if not allowed_subsets:
+            return results
+
+        if allowed_subsets == "ALL":
+            if not os.path.isdir(self.vault_path):
+                return results
+            target_subsets = [
+                d for d in os.listdir(self.vault_path)
+                if os.path.isdir(os.path.join(self.vault_path, d)) and not d.startswith("_")
+            ]
+        else:
+            target_subsets = list(allowed_subsets)
+
+        for subset in target_subsets:
+            dept_dir = os.path.join(self.vault_path, subset)
+            if not os.path.isdir(dept_dir):
+                continue
+            for file in os.listdir(dept_dir):
+                if not file.endswith(".md") or file.startswith("_"):
+                    continue
+                file_path = os.path.join(dept_dir, file)
+                try:
+                    post = frontmatter.load(file_path)
+                except Exception:
+                    continue
+                title = (post.get("title") or file).lower()
+                tags = str(post.get("tags", [])).lower()
+                summary = (post.get("summary") or "").lower()
+                relevance = 0
+                if keyword in title:
+                    relevance += 10
+                if keyword in tags:
+                    relevance += 5
+                if keyword in summary:
+                    relevance += 3
+                if relevance > 0:
+                    results.append({
+                        "path": file_path,
+                        "title": post.get("title", file),
+                        "relevance": relevance,
+                        "department": subset,
+                        "tags": post.get("tags", []),
+                        "summary": post.get("summary", ""),
+                        "doc_id": post.get("doc_id", "N/A"),
+                    })
         return results

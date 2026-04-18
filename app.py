@@ -1,16 +1,74 @@
 import streamlit as st
 import os
 import time
-import pandas as pd
+import ast
 import json
+import pandas as pd
 from core.Refinery import DataRefinery
 from core.Orchestrator import RAGOrchestrator
 from core.Exporter import FileExporter
 from core.Monitor import BackgroundMonitor
 from core.VaultWarden import VaultWarden
 from core.AuditJudge import AuditJudge
-from core.Utils import CONFIG, get_org_config, save_audit_event, ROOT_PATH, LLMInterface
+from core.Utils import CONFIG, get_org_config, save_org_structure, save_audit_event, ROOT_PATH, LLMInterface
 import threading
+
+
+def _df_to_json_safe_records(df: pd.DataFrame) -> list:
+    """Turn data_editor output into JSON-safe records (NaN -> None, fix stringified lists)."""
+    if df is None or df.empty:
+        return []
+    obj = df.astype(object).where(pd.notnull(df), None)
+    rows = obj.to_dict(orient="records")
+    for row in rows:
+        for key in ("keywords", "access"):
+            val = row.get(key)
+            if isinstance(val, str) and val.strip().startswith("["):
+                try:
+                    row[key] = ast.literal_eval(val)
+                except (SyntaxError, ValueError, TypeError, OSError):
+                    pass
+    return rows
+
+
+def _write_config_dotenv():
+    """Persist trial keys to local config/.env (gitignored)."""
+    path = os.path.join(ROOT_PATH, "config", ".env")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    _prov_map = {"Google": "google", "OpenAI": "openai", "Anthropic": "anthropic"}
+    _rp = _prov_map.get(st.session_state.get("selected_provider", "Google"), "google")
+    lines = [
+        "# Written from RAG-Destroyer System Config — do not commit.",
+        f"RAGD_PRIMARY_PROVIDER={_rp}",
+        f"GEMINI_MODEL={CONFIG.get('GEMINI_MODEL') or 'gemini-2.5-flash'}",
+    ]
+    g = (st.session_state.get("gemini_api_key") or "").strip()
+    o = (st.session_state.get("openai_api_key") or "").strip()
+    a = (st.session_state.get("anthropic_api_key") or "").strip()
+    ln = (st.session_state.get("line_notify_token") or "").strip()
+    if g:
+        lines.append(f"GEMINI_API_KEY={g}")
+    if o:
+        lines.append(f"OPENAI_API_KEY={o}")
+    if a:
+        lines.append(f"ANTHROPIC_API_KEY={a}")
+    if ln:
+        lines.append(f"LINE_NOTIFY_TOKEN={ln}")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return path
+
+
+def _provider_key_ready():
+    p = st.session_state.get("selected_provider", "Google")
+    if p == "Google":
+        return bool((st.session_state.get("gemini_api_key") or "").strip())
+    if p == "OpenAI":
+        return bool((st.session_state.get("openai_api_key") or "").strip())
+    if p == "Anthropic":
+        return bool((st.session_state.get("anthropic_api_key") or "").strip())
+    return False
+
 
 # Page Config
 st.set_page_config(page_title="RAG-Destroyer Industrial", page_icon="🏛️", layout="wide")
@@ -24,6 +82,8 @@ if "openai_api_key" not in st.session_state:
     st.session_state.openai_api_key = CONFIG.get("OPENAI_API_KEY", "")
 if "anthropic_api_key" not in st.session_state:
     st.session_state.anthropic_api_key = CONFIG.get("ANTHROPIC_API_KEY", "")
+if "line_notify_token" not in st.session_state:
+    st.session_state.line_notify_token = CONFIG.get("LINE_NOTIFY_TOKEN") or ""
 
 # Initialize Core Services
 @st.cache_resource
@@ -58,12 +118,7 @@ roles = [r["role"] for r in org_config.get("roles", [] )]
 # Helper for PnP Status Checklist
 def get_pnp_status():
     status = []
-    # API Check
-    api_ready = False
-    if st.session_state.selected_provider == "Google" and st.session_state.gemini_api_key: api_ready = True
-    elif st.session_state.selected_provider == "OpenAI" and st.session_state.openai_api_key: api_ready = True
-    elif st.session_state.selected_provider == "Anthropic" and st.session_state.anthropic_api_key: api_ready = True
-    
+    api_ready = _provider_key_ready()
     status.append(("✅ API Keys Linked" if api_ready else "❌ API Keys Missing", api_ready))
     
     # Storage Check
@@ -77,6 +132,19 @@ def get_pnp_status():
 
 if page == "🧠 GURU Assistant":
     st.title("🏛️ RAG-Destroyer: Financial Org Simulation")
+
+    if not _provider_key_ready():
+        st.info(
+            "**ผู้ทดลองใช้ / Trial:** เปิดแถบซ้ายไปที่ **🛠️ System Config** แล้วเลือกผู้ให้บริการ AI "
+            "และวาง **API key ของคุณเอง** (ไม่ถูกอัปโหลดไป GitHub). "
+            "**Trial:** Use **🛠️ System Config** in the sidebar to pick a provider and paste **your own API key**."
+        )
+
+    if st.session_state.get("guru_error"):
+        st.warning(
+            f"ครั้งล่าสุดล้มเหลว / Last run failed:\n\n`{st.session_state['guru_error']}`\n\n"
+            "ตรวจ API key, โควต้า, หรือเครือข่าย แล้วลองถามใหม่ / Check API key, quota, or network, then ask again."
+        )
     
     # Setup Checklist (Quick PnP View)
     with st.expander("🛠️ System Health & PnP Status", expanded=False):
@@ -120,18 +188,24 @@ if page == "🧠 GURU Assistant":
     
     if query:
         with st.status("🚀 GURU is scouting the authorized silos...", expanded=True) as status:
-            st.write("🔍 Identifying Swarm Keywords...")
-            time.sleep(1)
-            st.write("🤖 Dispatches Parallel Bots...")
-            # Result synthesis
-            result = services["orchestrator"].handle_request(query, allowed_search_subsets)
-            st.session_state.last_query = query
-            
-            st.write("⚖️ Running AI QC Audit (Dual 5+5 Scoring)...")
-            qc_result = services["judge"].evaluate(query, result['sources'], result['answer'])
-            result['qc'] = qc_result
-            st.session_state.current_result = result
-            status.update(label="✅ Synthesis Complete!", state="complete", expanded=False)
+            try:
+                st.write("🔍 Identifying Swarm Keywords...")
+                time.sleep(1)
+                st.write("🤖 Dispatches Parallel Bots...")
+                result = services["orchestrator"].handle_request(query, allowed_search_subsets)
+                st.session_state.last_query = query
+
+                st.write("⚖️ Running AI QC Audit (Dual 5+5 Scoring)...")
+                qc_result = services["judge"].evaluate(query, result["sources"], result["answer"])
+                result["qc"] = qc_result
+                st.session_state.current_result = result
+                st.session_state.pop("guru_error", None)
+                status.update(label="✅ Synthesis Complete!", state="complete", expanded=False)
+            except Exception as e:
+                st.session_state.current_result = None
+                st.session_state["guru_error"] = str(e)
+                status.update(label="❌ Request failed", state="error", expanded=True)
+                st.error(f"**ไม่สามารถประมวลผลคำขอได้ / Request failed:** {e}")
 
     # Display Result
     if st.session_state.current_result:
@@ -227,43 +301,138 @@ elif page == "📽️ Showcase Clips":
 
 elif page == "🛠️ System Config":
     st.title("🛠️ System Configuration")
-    
+
+    st.markdown(
+        """
+### ผู้ทดลองใช้ (Bring your own key)
+โคลนโปรเจกต์แล้วรัน `streamlit run app.py` — **ไม่ต้องมี `config/.env` ก่อน**  
+ใส่ API key **ของคุณ**ด้านล่างเพื่อทดลอง GURU, Refinery และ QC บนเครื่องคุณเท่านั้น  
+ค่า key เก็บใน **session ของ Streamlit** จนกว่าจะปิดแท็บ/รีสตาร์ทแอป (หรือกดบันทึกลงไฟล์ด้านล่าง)
+
+### Trial downloaders (BYOK)
+Clone, run `streamlit run app.py` — **no `config/.env` required** to start.  
+Paste **your** provider API key below to try GURU, Refinery, and QC locally. Keys stay in this **Streamlit session** until you close the tab or restart (optional: save to a local file below).
+        """
+    )
+
     # 1. Multi-LLM Setup
-    st.header("🔑 API Credentials (Plug & Play)")
-    st.session_state.selected_provider = st.selectbox("Select Primary AI Provider", ["Google", "OpenAI", "Anthropic"], 
-                                                        index=["Google", "OpenAI", "Anthropic"].index(st.session_state.selected_provider))
-    
+    st.header("🔑 API credentials (your keys)")
+    st.session_state.selected_provider = st.selectbox(
+        "Primary AI provider",
+        ["Google", "OpenAI", "Anthropic"],
+        index=["Google", "OpenAI", "Anthropic"].index(st.session_state.selected_provider),
+        help="เลือกให้ตรงกับ key ที่คุณจะวาง / Must match the key you paste.",
+    )
+
     col1, col2 = st.columns(2)
     with col1:
-        st.session_state.gemini_api_key = st.text_input("Gemini API Key", value=st.session_state.gemini_api_key, type="password")
-        st.session_state.openai_api_key = st.text_input("OpenAI API Key", value=st.session_state.openai_api_key, type="password")
+        st.session_state.gemini_api_key = st.text_input(
+            "Google Gemini API key",
+            value=st.session_state.gemini_api_key,
+            type="password",
+            help="https://aistudio.google.com/apikey",
+        )
+        st.session_state.openai_api_key = st.text_input(
+            "OpenAI API key",
+            value=st.session_state.openai_api_key,
+            type="password",
+            help="https://platform.openai.com/api-keys",
+        )
     with col2:
-        st.session_state.anthropic_api_key = st.text_input("Anthropic API Key", value=st.session_state.anthropic_api_key, type="password")
-        st.session_state.line_notify_token = st.text_input("LINE Notify Token", value=CONFIG.get("LINE_NOTIFY_TOKEN", ""), type="password")
+        st.session_state.anthropic_api_key = st.text_input(
+            "Anthropic API key",
+            value=st.session_state.anthropic_api_key,
+            type="password",
+            help="https://console.anthropic.com/",
+        )
+        st.session_state.line_notify_token = st.text_input(
+            "LINE Notify token (optional)",
+            value=st.session_state.line_notify_token,
+            type="password",
+        )
+
+    st.caption(
+        "คีย์ไม่ถูกส่งไป GitHub — รันแบบ local เท่านั้น / Keys are not sent to GitHub; this app runs locally."
+    )
+
+    c_save, c_clear = st.columns(2)
+    with c_save:
+        if st.button("💾 Save keys to config/.env on this PC", help="Creates `config/.env` (gitignored). Convenient for next run."):
+            _write_config_dotenv()
+            st.success("Saved to `config/.env`. Restart the app once if you want `python-dotenv` to reload it at import time.")
+    with c_clear:
+        if st.button("🗑️ Clear keys from this session"):
+            st.session_state.gemini_api_key = ""
+            st.session_state.openai_api_key = ""
+            st.session_state.anthropic_api_key = ""
+            st.session_state.line_notify_token = ""
+            get_services.clear()
+            st.rerun()
+
+    st.caption("แม่แบบตัวแปร: `config/.env.example` — คัดลอกเป็น `config/.env` แล้วแก้ได้ด้วยมือ / Template: `config/.env.example`.")
 
     # 2. Knowledge Valve (Path Settings)
     st.divider()
-    st.header("📁 Knowledge Valve (Storage Paths)")
-    raw_path = st.text_input("Raw Data Ingestion Path", value=CONFIG["RAW_DATA_PATH"])
-    vault_path = st.text_input("Cleaned Knowledge Vault Path", value=CONFIG["CLEANED_DATA_PATH"])
-    
-    if st.button("🔧 Apply Storage Config"):
-        st.info("Storage configuration updated. Paths will be used for the current session.")
+    st.header("📁 Knowledge paths (optional)")
+    raw_path = st.text_input("Raw data folder", value=CONFIG["RAW_DATA_PATH"])
+    vault_path = st.text_input("Knowledge vault folder", value=CONFIG["CLEANED_DATA_PATH"])
+
+    if st.button("🔧 Apply storage paths"):
+        CONFIG["RAW_DATA_PATH"] = raw_path.strip()
+        CONFIG["CLEANED_DATA_PATH"] = vault_path.strip()
+        get_services.clear()
+        st.success("Paths updated. Orchestrator & refinery reloaded. Restart Streamlit if the background file watcher should use the new raw folder.")
+        st.rerun()
+
+    # 2b. Vault index (search cache)
+    st.divider()
+    st.header("📇 Vault index & search cache")
+    st.caption(
+        "สแกนโฟลเดอร์ knowledge แล้วสร้าง `_SEARCH_CACHE.json` และ `_MASTER_INDEX.md` "
+        "ให้การค้นหาเร็วขึ้น / Scans the knowledge vault for fast deterministic search."
+    )
+    if st.button("🔁 Rebuild vault index & search cache", type="primary"):
+        with st.spinner("Indexing markdown vault..."):
+            services["warden"].audit_and_index()
+        get_services.clear()
+        st.success("Index updated. Orchestrator reloaded.")
+        st.rerun()
 
     # 3. Org Structure Data
     st.divider()
-    st.header("🏢 Organization Structure Editor")
+    st.header("🏢 Organization structure")
+    st.caption(
+        "แก้แล้วกดบันทึกลง `config/org_structure.json` — ชื่อแผนกควรตรงกับโฟลเดอร์ใต้ `knowledge/` "
+        "/ Edit then save; department names should match folders under `knowledge/`."
+    )
     config_tab1, config_tab2 = st.tabs(["📁 Departments", "👤 Roles"])
     with config_tab1:
-        st.data_editor(pd.DataFrame(org_config['departments']), width=None)
+        dept_df = st.data_editor(
+            pd.DataFrame(org_config.get("departments", [])),
+            num_rows="dynamic",
+            use_container_width=True,
+            key="org_edit_departments",
+        )
     with config_tab2:
-        st.data_editor(pd.DataFrame(org_config['roles']), width=None)
+        role_df = st.data_editor(
+            pd.DataFrame(org_config.get("roles", [])),
+            num_rows="dynamic",
+            use_container_width=True,
+            key="org_edit_roles",
+        )
+    if st.button("💾 Save organization to config/org_structure.json"):
+        merged = dict(org_config)
+        merged["departments"] = _df_to_json_safe_records(dept_df)
+        merged["roles"] = _df_to_json_safe_records(role_df)
+        save_org_structure(merged)
+        st.success("Saved `config/org_structure.json`. Refreshing…")
+        st.rerun()
 
 # Footer
 st.sidebar.divider()
 st.sidebar.caption(f"RAG-Destroyer Industrial | Build: {time.strftime('%Y%j')}")
 st.sidebar.caption("Privacy: Local Vault & API Keys are NOT shared with GitHub.")
 
-# Critical PnP Notification
-if not st.session_state.gemini_api_key and st.session_state.selected_provider == "Google":
-    st.sidebar.error("⚠️ Gemini API Key Missing. Setup required in Config.")
+# PnP: remind trial users to set the key for the selected provider
+if not _provider_key_ready():
+    st.sidebar.warning("⚠️ API key: open **🛠️ System Config** and paste your key for the selected provider.")

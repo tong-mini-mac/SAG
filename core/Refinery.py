@@ -6,11 +6,15 @@ from .Utils import LLMInterface, extract_json, CONFIG
 class DataRefinery:
     def __init__(self, vault_path=None):
         self.vault_path = vault_path or CONFIG["CLEANED_DATA_PATH"]
-        self.ai = LLMInterface.get_client()
         self.registry_file = os.path.join(os.path.dirname(__file__), "..", "workspace", "registry_counters.json")
         self.org_config_file = os.path.join(os.path.dirname(__file__), "..", "config", "org_structure.json")
         os.makedirs(os.path.dirname(self.registry_file), exist_ok=True)
         os.makedirs(self.vault_path, exist_ok=True)
+
+    @property
+    def ai(self):
+        """Always resolve latest keys from Streamlit session / config (trial PnP)."""
+        return LLMInterface.get_client()
 
     def _load_org_config(self):
         if os.path.exists(self.org_config_file):

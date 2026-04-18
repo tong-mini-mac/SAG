@@ -44,6 +44,13 @@ def get_org_config():
             return json.load(f)
     return {}
 
+def save_org_structure(config_dict: dict) -> None:
+    """Persist full org JSON (departments, roles, metadata) to config/org_structure.json."""
+    path = CONFIG["ORG_STRUCTURE_PATH"]
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(config_dict, f, ensure_ascii=False, indent=2)
+
 def safe_ai_call(func, *args, max_retries=3, **kwargs):
     """Safe wrapper for AI calls with exponential backoff and notification support."""
     for attempt in range(max_retries):
@@ -125,9 +132,24 @@ class LLMInterface:
                 model = CONFIG["GEMINI_MODEL"]
             
             return LLMFactory.get_client(provider, key, model)
-        except:
-            # Fallback for CLI/background usage
-            return LLMFactory.get_client("Google", CONFIG["GEMINI_API_KEY"], CONFIG["GEMINI_MODEL"])
+        except Exception:
+            # CLI / scripts / threads: no Streamlit session — pick provider via RAGD_PRIMARY_PROVIDER
+            p = (os.getenv("RAGD_PRIMARY_PROVIDER") or "google").strip().lower()
+            if p in ("openai", "gpt"):
+                key = CONFIG.get("OPENAI_API_KEY")
+                model = os.getenv("OPENAI_MODEL") or os.getenv("RAGD_OPENAI_MODEL") or "gpt-4o"
+                return LLMFactory.get_client("OpenAI", key, model)
+            if p in ("anthropic", "claude"):
+                key = CONFIG.get("ANTHROPIC_API_KEY")
+                model = (
+                    os.getenv("ANTHROPIC_MODEL")
+                    or os.getenv("RAGD_ANTHROPIC_MODEL")
+                    or "claude-3-5-sonnet-20240620"
+                )
+                return LLMFactory.get_client("Anthropic", key, model)
+            key = CONFIG.get("GEMINI_API_KEY")
+            model = CONFIG.get("GEMINI_MODEL") or "gemini-2.5-flash"
+            return LLMFactory.get_client("Google", key, model)
 
 def save_audit_event(data):
     """Saves an audit event (query + result + QC) to the log file."""

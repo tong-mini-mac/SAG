@@ -78,18 +78,23 @@ We got so obsessed with shiny Vector DBs and complex embeddings that we forgot b
 
 ### Installation
 ```bash
-git clone https://github.com/vittaya1973/RAG-Destroyer.git
+git clone https://github.com/tong-mini-mac/RAG-Destroyer.git
 cd RAG-Destroyer
 pip install -r requirements.txt
 ```
 
-### Configuration
-Update `config/.env` with your API keys:
-```env
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.5-flash
-LINE_NOTIFY_TOKEN=Optional_Token
-```
+Optional: features that call Pandoc (via `pypandoc`) need the [Pandoc](https://pandoc.org/installing.html) binary installed on your OS.
+
+### Configuration (trial / BYOK)
+You do **not** need a `config/.env` file to try the app.
+
+1. Run the UI (below).
+2. Open **🛠️ System Config** in the sidebar, choose **Google**, **OpenAI**, or **Anthropic**, and paste **your own** API key. Keys stay in your local Streamlit session until you close the tab or restart.
+3. Optional: click **Save keys to config/.env on this PC** to persist keys locally (`config/.env` is gitignored). See `config/.env.example` for variable names.
+
+Alternatively, copy `config/.env.example` to `config/.env` and fill in keys before starting.
+
+For **CLI scripts** (no Streamlit session), set `RAGD_PRIMARY_PROVIDER` to `google`, `openai`, or `anthropic` so the correct key is used — the in-app **Save keys to config/.env** button writes this when you save.
 
 ### Run the UI
 ```bash

@@ -8,12 +8,13 @@ Welcome to the **Industrial RAG-Destroyer (Zero-Vector-DB)**. This guide will he
 - **Python 3.9+**
 - **Obsidian** (Optional, for managing your Markdown knowledge silos)
 - **API Key** (Gemini, OpenAI, or Anthropic)
+- **Pandoc** (Optional — only if you use export paths that call `pypandoc`; see [pandoc.org](https://pandoc.org/installing.html))
 
 ---
 
 ## 🚀 Step 1: Clone & Install
 ```bash
-git clone https://github.com/vittaya1973/RAG-Destroyer.git
+git clone https://github.com/tong-mini-mac/RAG-Destroyer.git
 cd RAG-Destroyer
 pip install -r requirements.txt
 ```
@@ -22,18 +23,30 @@ pip install -r requirements.txt
 
 ## 🔌 Step 2: The "Plug & Play" Valve Setup
 
-When you start the app, go to the **🛠️ System Config** page.
+Start the app first — **no `config/.env` is required** for a quick trial.
 
-### 1. Link your AI Provider
-RAG-Destroyer supports multiple providers. Select your favorite and paste your key:
-- **Google Gemini** (Recommended for speed/cost)
+When the UI is open, go to **🛠️ System Config**.
+
+### 1. Link your AI provider (BYOK)
+RAG-Destroyer supports multiple providers. Select one and paste **your own** API key (keys stay in this browser session unless you choose **Save keys to config/.env**):
+
+- **Google Gemini** (recommended for speed/cost)
 - **OpenAI GPT-4o**
 - **Anthropic Claude 3.5**
 
-### 2. Connect your Knowledge Vault
+See `config/.env.example` if you prefer file-based configuration.
+
+### 2. Connect your knowledge vault (optional)
 Set the paths to your local folders:
+
 - **Raw Data Ingestion**: Where you drop your raw PDFs or Text files.
 - **Knowledge Vault**: Where the AI stores the "Cleaned" and "Tagged" research documents.
+
+Click **Apply storage paths** if you change defaults; restart Streamlit if the background file watcher should use a new raw folder.
+
+### CLI scripts (`run_qc_field_trial.py`, etc.)
+
+Outside Streamlit there is no session state. Set **`RAGD_PRIMARY_PROVIDER`** to `google`, `openai`, or `anthropic` in `config/.env` (or export it), and provide the matching API key. Saving keys from the app’s **System Config** also writes `RAGD_PRIMARY_PROVIDER` for you.
 
 ---
 

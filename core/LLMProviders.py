@@ -10,6 +10,15 @@ class BaseLLMClient(ABC):
     def call(self, prompt, system_instruction=None, json_mode=False):
         pass
 
+class MissingApiKeyProvider(BaseLLMClient):
+    """Placeholder when no key is set so the UI and watchdog can start."""
+
+    def call(self, prompt, system_instruction=None, json_mode=False):
+        raise RuntimeError(
+            "AI API key is not set. Open System Config in the sidebar, or set "
+            "GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY in config/.env."
+        )
+
 class GeminiProvider(BaseLLMClient):
     def __init__(self, api_key, model="gemini-2.5-flash"):
         self.client = genai.Client(api_key=api_key)
@@ -81,6 +90,8 @@ class AnthropicProvider(BaseLLMClient):
 class LLMFactory:
     @staticmethod
     def get_client(provider_name, api_key, model=None):
+        if not api_key:
+            return MissingApiKeyProvider()
         if provider_name.lower() == "google":
             return GeminiProvider(api_key, model or "gemini-2.5-flash")
         elif provider_name.lower() == "openai":
