@@ -135,15 +135,14 @@ if page == "🧠 GURU Assistant":
 
     if not _provider_key_ready():
         st.info(
-            "**ผู้ทดลองใช้ / Trial:** เปิดแถบซ้ายไปที่ **🛠️ System Config** แล้วเลือกผู้ให้บริการ AI "
-            "และวาง **API key ของคุณเอง** (ไม่ถูกอัปโหลดไป GitHub). "
-            "**Trial:** Use **🛠️ System Config** in the sidebar to pick a provider and paste **your own API key**."
+            "**Trial setup:** Open **🛠️ System Config** in the sidebar, choose your AI provider, "
+            "and paste **your own API key**. Keys are not uploaded to GitHub; everything runs locally."
         )
 
     if st.session_state.get("guru_error"):
         st.warning(
-            f"ครั้งล่าสุดล้มเหลว / Last run failed:\n\n`{st.session_state['guru_error']}`\n\n"
-            "ตรวจ API key, โควต้า, หรือเครือข่าย แล้วลองถามใหม่ / Check API key, quota, or network, then ask again."
+            f"**Last request failed:**\n\n`{st.session_state['guru_error']}`\n\n"
+            "Check your API key, quota, or network, then try again."
         )
     
     # Setup Checklist (Quick PnP View)
@@ -205,7 +204,7 @@ if page == "🧠 GURU Assistant":
                 st.session_state.current_result = None
                 st.session_state["guru_error"] = str(e)
                 status.update(label="❌ Request failed", state="error", expanded=True)
-                st.error(f"**ไม่สามารถประมวลผลคำขอได้ / Request failed:** {e}")
+                st.error(f"**Request failed:** {e}")
 
     # Display Result
     if st.session_state.current_result:
@@ -304,14 +303,10 @@ elif page == "🛠️ System Config":
 
     st.markdown(
         """
-### ผู้ทดลองใช้ (Bring your own key)
-โคลนโปรเจกต์แล้วรัน `streamlit run app.py` — **ไม่ต้องมี `config/.env` ก่อน**  
-ใส่ API key **ของคุณ**ด้านล่างเพื่อทดลอง GURU, Refinery และ QC บนเครื่องคุณเท่านั้น  
-ค่า key เก็บใน **session ของ Streamlit** จนกว่าจะปิดแท็บ/รีสตาร์ทแอป (หรือกดบันทึกลงไฟล์ด้านล่าง)
+### Bring your own key (BYOK)
+Clone the repo and run `streamlit run app.py` — **no `config/.env` is required** to start.
 
-### Trial downloaders (BYOK)
-Clone, run `streamlit run app.py` — **no `config/.env` required** to start.  
-Paste **your** provider API key below to try GURU, Refinery, and QC locally. Keys stay in this **Streamlit session** until you close the tab or restart (optional: save to a local file below).
+Paste **your** provider API key below to try GURU, Refinery, and QC on your machine only. Keys stay in this **Streamlit session** until you close the tab or restart the app (optional: use **Save keys to config/.env** below to persist them locally).
         """
     )
 
@@ -321,7 +316,7 @@ Paste **your** provider API key below to try GURU, Refinery, and QC locally. Key
         "Primary AI provider",
         ["Google", "OpenAI", "Anthropic"],
         index=["Google", "OpenAI", "Anthropic"].index(st.session_state.selected_provider),
-        help="เลือกให้ตรงกับ key ที่คุณจะวาง / Must match the key you paste.",
+        help="Must match the API key you paste for that vendor.",
     )
 
     col1, col2 = st.columns(2)
@@ -351,9 +346,7 @@ Paste **your** provider API key below to try GURU, Refinery, and QC locally. Key
             type="password",
         )
 
-    st.caption(
-        "คีย์ไม่ถูกส่งไป GitHub — รันแบบ local เท่านั้น / Keys are not sent to GitHub; this app runs locally."
-    )
+    st.caption("Keys are not sent to GitHub; this app runs locally.")
 
     c_save, c_clear = st.columns(2)
     with c_save:
@@ -369,7 +362,7 @@ Paste **your** provider API key below to try GURU, Refinery, and QC locally. Key
             get_services.clear()
             st.rerun()
 
-    st.caption("แม่แบบตัวแปร: `config/.env.example` — คัดลอกเป็น `config/.env` แล้วแก้ได้ด้วยมือ / Template: `config/.env.example`.")
+    st.caption("Template for manual setup: copy `config/.env.example` to `config/.env` and edit values.")
 
     # 2. Knowledge Valve (Path Settings)
     st.divider()
@@ -388,8 +381,7 @@ Paste **your** provider API key below to try GURU, Refinery, and QC locally. Key
     st.divider()
     st.header("📇 Vault index & search cache")
     st.caption(
-        "สแกนโฟลเดอร์ knowledge แล้วสร้าง `_SEARCH_CACHE.json` และ `_MASTER_INDEX.md` "
-        "ให้การค้นหาเร็วขึ้น / Scans the knowledge vault for fast deterministic search."
+        "Scans the knowledge vault and writes `_SEARCH_CACHE.json` and `_MASTER_INDEX.md` for faster deterministic search."
     )
     if st.button("🔁 Rebuild vault index & search cache", type="primary"):
         with st.spinner("Indexing markdown vault..."):
@@ -402,8 +394,7 @@ Paste **your** provider API key below to try GURU, Refinery, and QC locally. Key
     st.divider()
     st.header("🏢 Organization structure")
     st.caption(
-        "แก้แล้วกดบันทึกลง `config/org_structure.json` — ชื่อแผนกควรตรงกับโฟลเดอร์ใต้ `knowledge/` "
-        "/ Edit then save; department names should match folders under `knowledge/`."
+        "Edit tables, then save to `config/org_structure.json`. Department **names** should match subfolders under `knowledge/`."
     )
     config_tab1, config_tab2 = st.tabs(["📁 Departments", "👤 Roles"])
     with config_tab1:
