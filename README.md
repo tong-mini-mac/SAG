@@ -74,38 +74,121 @@ We got so obsessed with shiny Vector DBs and complex embeddings that we forgot b
 
 ---
 
-## 🛠️ Tech Stack & Quick Start
+## 🛠️ Quick start & operations
 
-### Installation
+**In this section:** (1) two-folder layout & subset rules → (2) first-time steps 1–6 → (3) production checklist → (4) env/CLI notes → (5) tech reference.
+
+---
+
+### 1) Two folders, subsets, and where `.md` comes from
+
+Everything below uses defaults from `core/Utils.py`. Override paths with environment variables or **🛠️ System Config** in the app.
+
+| Layer | Path (default) | Config key | What it is |
+| :--- | :--- | :--- | :--- |
+| **Raw** | `raw_data/` | `RAW_DATA_PATH` | Drop unstructured files here first. |
+| **Cleaned** | `knowledge/` | `CLEANED_DATA_PATH` | The **only** tree GURU indexes—your “cleaned data” vault (name can stay `knowledge/`). |
+
+**Automated pipeline (raw → cleaned)**  
+With Streamlit running, the **background monitor** watches `raw_data/`. **`DataRefinery`** calls your **LLM** to classify content, suggest a filename, and write **Markdown + YAML front matter** straight into **`knowledge/<Department>/`**. No second staging folder. **Obsidian does not run this step** and never receives raw drops.
+
+**Subset (who sees what)**  
+“Subset” is enforced at **query time** in Python: allowed **department folders** under `knowledge/`, using `config/org_structure.json` and the role you pick in the UI (`SearchWorker` / `RAGOrchestrator`). **Obsidian does not split subsets.** Optionally open `knowledge/` in Obsidian **after** files exist to edit, link, or tag—folder names must still match silos.
+
+| How `.md` gets into `knowledge/` | Details |
+| :--- | :--- |
+| **Refinery (automated)** | `raw_data/` → LLM classification → `knowledge/<Department>/` (monitor or batch `DataRefinery().scan_and_refine_all()`). |
+| **Manual** | Create/edit `.md` in VS Code, Cursor, Obsidian, etc. |
+| **Office / PDF** | Optional **[Pandoc](https://pandoc.org/installing.html)** if you use Pandoc-based flows; place output under the right silo. |
+| **Bulk import** | Copy pre-cleaned trees into `knowledge/`; department folder names must match **`org_structure.json`**. |
+
+---
+
+### 2) First-time run (steps 1–6)
+
+Do these in order for the PoC.
+
+**1. Install the codebase**
+
 ```bash
 git clone https://github.com/tong-mini-mac/RAG-Destroyer.git
 cd RAG-Destroyer
 pip install -r requirements.txt
 ```
 
-Optional: features that call Pandoc (via `pypandoc`) need the [Pandoc](https://pandoc.org/installing.html) binary installed on your OS.
+Optional: create a virtual environment (`python -m venv .venv` then activate) before `pip install`. Optional: install the [Pandoc](https://pandoc.org/installing.html) binary if you rely on Pandoc-based export features (`pypandoc`).
 
-### Configuration (trial / BYOK)
-You do **not** need a `config/.env` file to try the app.
+**2. Start the UI**
 
-1. Run the UI (below).
-2. Open **🛠️ System Config** in the sidebar, choose **Google**, **OpenAI**, or **Anthropic**, and paste **your own** API key. Keys stay in your local Streamlit session until you close the tab or restart.
-3. Optional: click **Save keys to config/.env on this PC** to persist keys locally (`config/.env` is gitignored). See `config/.env.example` for variable names.
-
-Alternatively, copy `config/.env.example` to `config/.env` and fill in keys before starting.
-
-For **CLI scripts** (no Streamlit session), set `RAGD_PRIMARY_PROVIDER` to `google`, `openai`, or `anthropic` so the correct key is used — the in-app **Save keys to config/.env** button writes this when you save.
-
-### Run the UI
 ```bash
 streamlit run app.py
 ```
+
+On Windows, if you maintain a local launcher script (e.g. `start.bat`), you can use that instead—it should `cd` to this folder and run Streamlit with your venv.
+
+**3. Connect an LLM (BYOK)**
+
+1. When the app opens, complete the minimal **API key** step, **or** open **🛠️ System Config** in the sidebar.
+2. Choose **Google**, **OpenAI**, or **Anthropic** and paste **your own** API key. Keys stay in the Streamlit session until you close the tab.
+3. Optional: click **Save keys to config/.env on this PC** so keys reload on the next run (`config/.env` is gitignored). See `config/.env.example`.
+
+Refinery/raw ingestion **requires** a working key—search and GURU need it too.
+
+**4. Put knowledge on disk — pick one track**
+
+| Track | When to use | What to do |
+| :--- | :--- | :--- |
+| **A — Trial / cleaned vault** | You already have (or imported) Markdown silos—e.g. demo data, Google Drive sync, manual copy | (1) Folder names under `knowledge/` must match **department `name`** fields in `config/org_structure.json`. (2) Place `.md` files with YAML front matter (`title`, `doc_id`, `tags`, `summary`, …) under `knowledge/<Department>/`. **Obsidian is not required** if files are already there—you can edit with VS Code/Cursor/Obsidian. |
+| **B — Raw → cleaned Markdown (automated)** | You have unstructured drops (txt, pasted exports, …) | (1) Ensure step 3 is done—**DataRefinery** calls your LLM. (2) Drop files into **`raw_data/`** (raw). (3) Keep Streamlit running: the **background monitor** writes **`.md` straight into `knowledge/<Department>/`** (cleaned). *(4) Batch alternative from project root (venv active):* `python -c "from core.Refinery import DataRefinery; DataRefinery().scan_and_refine_all()"`. |
+
+Regardless of track, **GURU only reads the cleaned vault** (`CLEANED_DATA_PATH`, default `knowledge/`).
+
+**5. Refresh indexes after bulk changes**
+
+After copying many files or changing paths, open **🛠️ System Config** → **Rebuild vault index & search cache** so `_SEARCH_CACHE.json` / `_MASTER_INDEX.md` stay accurate.
+
+**6. Query with GURU**
+
+Open **🧠 GURU Assistant**, choose **role** and **department**, confirm the **document preview table** matches your simulated access, then ask your question in the chat box.
+
+---
+
+### 3) Production checklist
+
+Use when “trial data” becomes real content. This repo stays a PoC—you own security, deployment, and governance.
+
+1. **Secrets** — Store keys in **`config/.env`** (gitignored), a vault, or your cloud secret manager—never in git. Restrict OS permissions on that file. Rotate API keys per policy.
+2. **Vault matches the org model** — Keep **`knowledge/<Department>/`** folder names aligned with **`config/org_structure.json`**. Remember: **filesystem permissions** on those folders are the practical access boundary; sidebar “roles” only **simulate** RBAC inside the demo UI.
+3. **Ingestion governance** — Define who may write to **`raw_data/`**. Review **`DataRefinery`** output—the LLM can mis-label a department. After bulk imports or path changes, run **Rebuild vault index & search cache** (System Config). Optionally add a human QA step before treating new `.md` as authoritative.
+4. **Paths & hosting** — Set **Raw data** / **Knowledge vault** paths in **System Config** when the vault lives on another drive or share. Run Streamlit **locally**, **behind VPN**, or in a **container / VM** as appropriate; put a **reverse proxy + TLS** in front if exposing beyond localhost.
+5. **Monitoring** — Set **`LINE_NOTIFY_TOKEN`** in `.env` if you rely on LINE alerts from the watchdog/monitor paths; verify notifications in lower environments first.
+6. **Backups** — Schedule backups of **`knowledge/`**, **`config/`**, and **`logs/`** (and audit artifacts) independently of `git clone`.
+7. **Models & spend** — Pin **`GEMINI_MODEL`** / provider equivalents in `.env`; track provider billing and quotas.
+8. **Editorial workflow** — For teams maintaining Markdown at scale, standardize on **Obsidian**, **Git**, or internal CMS export into `knowledge/`—pick one workflow and document it for authors.
+
+Complete **steps 1–6** first; then apply this checklist as needed.
+
+---
+
+### Obsidian (optional reminder)
+
+- **Trial with pre-cleaned Markdown:** Obsidian **not required**—the app only reads files on disk.  
+- **Ongoing editing:** Many teams open `knowledge/` as an [Obsidian](https://obsidian.md/) vault for links/tags/graph; others use VS Code/Cursor. `.obsidian/` remains gitignored.
+
+### 4) Configuration extras (CLI / persistence)
+
+You do **not** need `config/.env` to open the UI—see **§2 step 3** above for BYOK.
+
+- Copy `config/.env.example` → `config/.env` and fill variables, **or** use **Save keys to config/.env on this PC** in the app (`config/.env` is gitignored).
+- For **CLI / scripts** without Streamlit, set `RAGD_PRIMARY_PROVIDER` to `google`, `openai`, or `anthropic` (same values the in-app save button writes) so the correct API key is read.
+
+### 5) Tech reference
 
 | Category | Technology | Purpose |
 | :--- | :--- | :--- |
 | **Orchestration** | `Python 3.9+` | Core control logic |
 | **Logic Layer** | `Gemini 2.5 Flash` | Query interpretation & response synthesis |
-| **Storage** | `Obsidian (Markdown)` | Distributed knowledge vault |
+| **Storage** | Markdown vault (`knowledge/`, Obsidian-compatible) | Distributed silos on disk |
 | **UI Framework** | `Streamlit` | Enterprise Guru dashboard |
 | **Resilience** | `Industrial Watchdog` | PID Lock, Auto-Recovery, & LINE Notify |
 

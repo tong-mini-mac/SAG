@@ -10,7 +10,16 @@ from core.Exporter import FileExporter
 from core.Monitor import BackgroundMonitor
 from core.VaultWarden import VaultWarden
 from core.AuditJudge import AuditJudge
-from core.Utils import CONFIG, get_org_config, save_org_structure, save_audit_event, ROOT_PATH, LLMInterface
+from core.Utils import (
+    CONFIG,
+    get_org_config,
+    save_org_structure,
+    save_audit_event,
+    ROOT_PATH,
+    LLMInterface,
+    vault_doc_counts_for_departments,
+    list_authorized_vault_documents,
+)
 import threading
 
 
@@ -31,16 +40,26 @@ def _df_to_json_safe_records(df: pd.DataFrame) -> list:
     return rows
 
 
+_GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"]
+_OPENAI_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+_ANTHROPIC_MODELS = ["claude-3-5-sonnet-20240620", "claude-3-5-haiku-20241022"]
+
+
 def _write_config_dotenv():
     """Persist trial keys to local config/.env (gitignored)."""
     path = os.path.join(ROOT_PATH, "config", ".env")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     _prov_map = {"Google": "google", "OpenAI": "openai", "Anthropic": "anthropic"}
     _rp = _prov_map.get(st.session_state.get("selected_provider", "Google"), "google")
+    gm = (st.session_state.get("gemini_model") or CONFIG.get("GEMINI_MODEL") or "gemini-2.5-flash").strip()
+    om = (st.session_state.get("openai_model") or CONFIG.get("OPENAI_MODEL") or "gpt-4o").strip()
+    am = (st.session_state.get("anthropic_model") or CONFIG.get("ANTHROPIC_MODEL") or "claude-3-5-sonnet-20240620").strip()
     lines = [
-        "# Written from RAG-Destroyer System Config — do not commit.",
+        "# Written from RAG-Destroyer — do not commit.",
         f"RAGD_PRIMARY_PROVIDER={_rp}",
-        f"GEMINI_MODEL={CONFIG.get('GEMINI_MODEL') or 'gemini-2.5-flash'}",
+        f"GEMINI_MODEL={gm}",
+        f"OPENAI_MODEL={om}",
+        f"ANTHROPIC_MODEL={am}",
     ]
     g = (st.session_state.get("gemini_api_key") or "").strip()
     o = (st.session_state.get("openai_api_key") or "").strip()
@@ -84,6 +103,12 @@ if "anthropic_api_key" not in st.session_state:
     st.session_state.anthropic_api_key = CONFIG.get("ANTHROPIC_API_KEY", "")
 if "line_notify_token" not in st.session_state:
     st.session_state.line_notify_token = CONFIG.get("LINE_NOTIFY_TOKEN") or ""
+if "gemini_model" not in st.session_state:
+    st.session_state.gemini_model = CONFIG.get("GEMINI_MODEL") or "gemini-2.5-flash"
+if "openai_model" not in st.session_state:
+    st.session_state.openai_model = CONFIG.get("OPENAI_MODEL") or "gpt-4o"
+if "anthropic_model" not in st.session_state:
+    st.session_state.anthropic_model = CONFIG.get("ANTHROPIC_MODEL") or "claude-3-5-sonnet-20240620"
 
 # Initialize Core Services
 @st.cache_resource
@@ -96,6 +121,79 @@ def get_services():
         "warden": VaultWarden()
     }
 
+
+def _pick_model_select(options: list[str], state_attr: str, widget_key: str):
+    cur = (st.session_state.get(state_attr) or "").strip()
+    if cur not in options:
+        cur = options[0]
+        st.session_state[state_attr] = cur
+    ix = options.index(cur)
+    val = st.selectbox("Model", options, index=ix, key=widget_key)
+    st.session_state[state_attr] = val
+
+
+def render_api_and_model_form(*, compact: bool = False, key_prefix: str = "gate"):
+    """Provider + model + API key (+ optional LINE). compact=True: gate before GURU."""
+    provs = ["Google", "OpenAI", "Anthropic"]
+    idx = provs.index(st.session_state.selected_provider) if st.session_state.selected_provider in provs else 0
+    st.session_state.selected_provider = st.selectbox(
+        "Provider", provs, index=idx, key=f"{key_prefix}_prov"
+    )
+    p = st.session_state.selected_provider
+
+    c_m, c_k = st.columns([1, 1])
+    with c_m:
+        if p == "Google":
+            _pick_model_select(_GEMINI_MODELS, "gemini_model", f"{key_prefix}_mm_g")
+        elif p == "OpenAI":
+            _pick_model_select(_OPENAI_MODELS, "openai_model", f"{key_prefix}_mm_o")
+        else:
+            _pick_model_select(_ANTHROPIC_MODELS, "anthropic_model", f"{key_prefix}_mm_a")
+    with c_k:
+        if p == "Google":
+            st.session_state.gemini_api_key = st.text_input(
+                "API key",
+                value=st.session_state.gemini_api_key,
+                type="password",
+                key=f"{key_prefix}_k_g",
+            )
+        elif p == "OpenAI":
+            st.session_state.openai_api_key = st.text_input(
+                "API key",
+                value=st.session_state.openai_api_key,
+                type="password",
+                key=f"{key_prefix}_k_o",
+            )
+        else:
+            st.session_state.anthropic_api_key = st.text_input(
+                "API key",
+                value=st.session_state.anthropic_api_key,
+                type="password",
+                key=f"{key_prefix}_k_a",
+            )
+
+    if not compact:
+        st.session_state.line_notify_token = st.text_input(
+            "LINE Notify (optional)",
+            value=st.session_state.line_notify_token,
+            type="password",
+            key="cfg_line",
+        )
+        c_save, c_clear = st.columns(2)
+        with c_save:
+            if st.button("Save to config/.env", key="cfg_save_env"):
+                _write_config_dotenv()
+                st.success("Saved `config/.env`. Restart once to reload env at startup.")
+        with c_clear:
+            if st.button("Clear keys (this session)", key="cfg_clear"):
+                st.session_state.gemini_api_key = ""
+                st.session_state.openai_api_key = ""
+                st.session_state.anthropic_api_key = ""
+                st.session_state.line_notify_token = ""
+                get_services.clear()
+                st.rerun()
+
+
 services = get_services()
 
 if "monitor_running" not in st.session_state:
@@ -107,8 +205,29 @@ if "current_result" not in st.session_state:
     st.session_state.current_result = None
 
 # Sidebar Navigation
-st.sidebar.title("🎮 Command Center")
-page = st.sidebar.radio("Navigate to:", ["🧠 GURU Assistant", "📊 Audit Dashboard", "📽️ Showcase Clips", "🛠️ System Config"])
+st.sidebar.title("Menu")
+
+PAGES = [
+    "🔑 Start",
+    "🧠 GURU Assistant",
+    "📊 Audit Dashboard",
+    "📽️ Showcase Clips",
+    "🛠️ System Config",
+]
+_PAGES_LAYOUT_VERSION = 1
+if st.session_state.get("_pages_layout_version", 0) < _PAGES_LAYOUT_VERSION:
+    st.session_state.sidebar_main_nav = PAGES[0]
+    st.session_state._pages_layout_version = _PAGES_LAYOUT_VERSION
+if "sidebar_main_nav" not in st.session_state:
+    st.session_state.sidebar_main_nav = PAGES[0]
+
+page = st.sidebar.radio(
+    "Go to",
+    PAGES,
+    key="sidebar_main_nav",
+)
+st.sidebar.divider()
+st.sidebar.caption(f"Build {time.strftime('%Y%j')} · local-only")
 
 # Load Org Data
 org_config = get_org_config()
@@ -130,14 +249,27 @@ def get_pnp_status():
     
     return status
 
-if page == "🧠 GURU Assistant":
+if page == "🔑 Start":
+    st.title("Start")
+    render_api_and_model_form(compact=True, key_prefix="start")
+    if st.button("Save to config/.env", key="start_save_env"):
+        _write_config_dotenv()
+        st.success("Saved.")
+    if _provider_key_ready():
+        st.success("Ready — open **🧠 GURU Assistant** in the sidebar.")
+
+elif page == "🧠 GURU Assistant":
+    if not _provider_key_ready():
+        st.warning("Add your API key on **🔑 Start** first.")
+        st.stop()
+
     st.title("🏛️ RAG-Destroyer: Financial Org Simulation")
 
-    if not _provider_key_ready():
-        st.info(
-            "**Trial setup:** Open **🛠️ System Config** in the sidebar, choose your AI provider, "
-            "and paste **your own API key**. Keys are not uploaded to GitHub; everything runs locally."
-        )
+    with st.expander("API & model", expanded=False):
+        render_api_and_model_form(compact=True, key_prefix="guru_exp")
+        if st.button("Save to config/.env", key="guru_exp_save"):
+            _write_config_dotenv()
+            st.success("Saved.")
 
     if st.session_state.get("guru_error"):
         st.warning(
@@ -151,35 +283,121 @@ if page == "🧠 GURU Assistant":
         for label, ready in status_items:
             st.write(label)
     
-    st.info(f"""
-    **🏢 Financial Organization Simulation (Digital Banking)**
-    This system uses the **Zero-Vector-DB** architecture to manage knowledge across departmental silos.
-    Knowledge is partitioned into {len(depts)} Primary Silos:
-    👉 **{', '.join(depts)}**
-    """)
+    with st.expander("About this simulation", expanded=False):
+        st.markdown(
+            f"""
+**Financial org simulation** — Zero-Vector-DB layout. Knowledge silos: **{', '.join(depts)}**.
+            """
+        )
     
     st.divider()
 
-    # Dropdowns for Identity Simulation
+    doc_counts = vault_doc_counts_for_departments(CONFIG["CLEANED_DATA_PATH"], depts)
+    total_docs = sum(doc_counts.values())
+    st.caption(
+        f"Vault `{CONFIG['CLEANED_DATA_PATH']}` · **{total_docs}** `.md` files across silos (pick a role below to see which ones you may use)."
+    )
+
+    # Identity: role drives RBAC; department picker only when role is silo-scoped (not CEO / ALL).
     col_p, col_d = st.columns(2)
     with col_p:
         selected_role = st.selectbox("👤 Identity Simulation (Select Position):", roles)
-    with col_d:
-        selected_dept = st.selectbox("📁 Active Department (Search Scope):", depts)
 
-    # Security Context Logic
     role_info = next((r for r in org_config.get("roles", []) if r["role"] == selected_role), {})
     role_access = role_info.get("access", "SUBSET")
-    
+
     if role_access == "ALL":
+        with col_d:
+            st.markdown(f"📁 **Search scope:** **all silos** ({total_docs} docs)")
         allowed_search_subsets = "ALL"
         st.success(f"👑 {selected_role}: Master GURU Access (Full Org Visibility)")
     elif isinstance(role_access, list):
+        _scope_docs = sum(doc_counts.get(d, 0) for d in role_access)
         allowed_search_subsets = role_access
-        st.warning(f"🛡️ {selected_role}: Multi-Silo Access ({', '.join(allowed_search_subsets)})")
+        with col_d:
+            if selected_role.startswith("CFO"):
+                st.markdown(
+                    f"📁 **CFO scope (finance & risk):** **{', '.join(role_access)}** · {_scope_docs} docs"
+                )
+            elif selected_role.startswith("CTO"):
+                st.markdown(
+                    f"📁 **CTO scope (tech & ops):** **{', '.join(role_access)}** · {_scope_docs} docs"
+                )
+            else:
+                st.markdown(
+                    f"📁 **Search scope:** **{', '.join(role_access)}** · {_scope_docs} docs"
+                )
+        if selected_role.startswith("CFO"):
+            st.info(
+                "💼 **CFO** — Finance & risk silos only (not org-wide like CEO)."
+            )
+        elif selected_role.startswith("CTO"):
+            st.info(
+                "💻 **CTO** — IT, operations & general silos only (not org-wide like CEO)."
+            )
+        else:
+            st.warning(f"🛡️ {selected_role}: Multi-silo access ({', '.join(allowed_search_subsets)})")
     else:
-        allowed_search_subsets = [selected_dept]
-        st.info(f"📁 Role: {selected_role} | Silo: {selected_dept} (Restricted Access)")
+        # SUBSET: scope = chosen silo; optional +General for VP (staff stays single silo).
+        with col_d:
+            selected_dept = st.selectbox(
+                "📁 Active Department (Search Scope):",
+                depts,
+                format_func=lambda d: f"{d} ({doc_counts.get(d, 0)} docs)",
+            )
+        _inc_gen = bool(role_info.get("subset_include_general", False))
+        if (
+            _inc_gen
+            and "General" in depts
+            and selected_dept != "General"
+        ):
+            allowed_search_subsets = [selected_dept, "General"]
+            _extra = doc_counts.get(selected_dept, 0) + doc_counts.get("General", 0)
+            st.info(
+                f"🏢 **{selected_role}** — silos **{selected_dept}** + **General** "
+                f"(policies/HQ context) · ~{_extra} docs"
+            )
+        else:
+            allowed_search_subsets = [selected_dept]
+            _n = doc_counts.get(selected_dept, 0)
+            if selected_role == "Operational Staff":
+                st.info(f"📋 **Operational Staff** — **{selected_dept}** silo only (~{_n} docs).")
+            else:
+                st.info(f"📁 **{selected_role}** — **{selected_dept}** (~{_n} docs)")
+
+    auth_doc_rows = list_authorized_vault_documents(
+        CONFIG["CLEANED_DATA_PATH"],
+        allowed_search_subsets,
+        depts,
+        viewer_role=selected_role,
+    )
+    st.markdown("##### Documents available to this identity (for drafting questions)")
+    st.caption(
+        "Preview matches search/GURU. Optional YAML frontmatter: **audience: management** "
+        "= head/C-suite only (hidden from Operational Staff in the same silo). Column **Audience** shows level."
+    )
+    if auth_doc_rows:
+        st.dataframe(
+            pd.DataFrame(auth_doc_rows),
+            hide_index=True,
+            use_container_width=True,
+            height=min(420, 120 + min(len(auth_doc_rows), 12) * 36),
+        )
+    else:
+        st.warning(
+            "No `.md` documents under your authorized silos. "
+            "Place files under `knowledge/<Department name>/` so folder names match **org_structure.json**, "
+            "or run **Rebuild vault index** from System Config."
+        )
+
+    with st.expander("Example questions (copy into chat)", expanded=False):
+        st.markdown(
+            """
+- What are the main policies or rules in **this** department’s vault?
+- Summarize anything related to **[topic]** from my allowed silos.
+- Are there deadlines, limits, or exceptions I should know?
+            """.strip()
+        )
 
     # Expert Query Interface
     st.divider()
@@ -191,7 +409,9 @@ if page == "🧠 GURU Assistant":
                 st.write("🔍 Identifying Swarm Keywords...")
                 time.sleep(1)
                 st.write("🤖 Dispatches Parallel Bots...")
-                result = services["orchestrator"].handle_request(query, allowed_search_subsets)
+                result = services["orchestrator"].handle_request(
+                    query, allowed_search_subsets, selected_role
+                )
                 st.session_state.last_query = query
 
                 st.write("⚖️ Running AI QC Audit (Dual 5+5 Scoring)...")
@@ -301,68 +521,8 @@ elif page == "📽️ Showcase Clips":
 elif page == "🛠️ System Config":
     st.title("🛠️ System Configuration")
 
-    st.markdown(
-        """
-### Bring your own key (BYOK)
-Clone the repo and run `streamlit run app.py` — **no `config/.env` is required** to start.
-
-Paste **your** provider API key below to try GURU, Refinery, and QC on your machine only. Keys stay in this **Streamlit session** until you close the tab or restart the app (optional: use **Save keys to config/.env** below to persist them locally).
-        """
-    )
-
-    # 1. Multi-LLM Setup
-    st.header("🔑 API credentials (your keys)")
-    st.session_state.selected_provider = st.selectbox(
-        "Primary AI provider",
-        ["Google", "OpenAI", "Anthropic"],
-        index=["Google", "OpenAI", "Anthropic"].index(st.session_state.selected_provider),
-        help="Must match the API key you paste for that vendor.",
-    )
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.session_state.gemini_api_key = st.text_input(
-            "Google Gemini API key",
-            value=st.session_state.gemini_api_key,
-            type="password",
-            help="https://aistudio.google.com/apikey",
-        )
-        st.session_state.openai_api_key = st.text_input(
-            "OpenAI API key",
-            value=st.session_state.openai_api_key,
-            type="password",
-            help="https://platform.openai.com/api-keys",
-        )
-    with col2:
-        st.session_state.anthropic_api_key = st.text_input(
-            "Anthropic API key",
-            value=st.session_state.anthropic_api_key,
-            type="password",
-            help="https://console.anthropic.com/",
-        )
-        st.session_state.line_notify_token = st.text_input(
-            "LINE Notify token (optional)",
-            value=st.session_state.line_notify_token,
-            type="password",
-        )
-
-    st.caption("Keys are not sent to GitHub; this app runs locally.")
-
-    c_save, c_clear = st.columns(2)
-    with c_save:
-        if st.button("💾 Save keys to config/.env on this PC", help="Creates `config/.env` (gitignored). Convenient for next run."):
-            _write_config_dotenv()
-            st.success("Saved to `config/.env`. Restart the app once if you want `python-dotenv` to reload it at import time.")
-    with c_clear:
-        if st.button("🗑️ Clear keys from this session"):
-            st.session_state.gemini_api_key = ""
-            st.session_state.openai_api_key = ""
-            st.session_state.anthropic_api_key = ""
-            st.session_state.line_notify_token = ""
-            get_services.clear()
-            st.rerun()
-
-    st.caption("Template for manual setup: copy `config/.env.example` to `config/.env` and edit values.")
+    with st.expander("API & model (+ LINE optional)", expanded=False):
+        render_api_and_model_form(compact=False, key_prefix="syscfg")
 
     # 2. Knowledge Valve (Path Settings)
     st.divider()
@@ -418,12 +578,3 @@ Paste **your** provider API key below to try GURU, Refinery, and QC on your mach
         save_org_structure(merged)
         st.success("Saved `config/org_structure.json`. Refreshing…")
         st.rerun()
-
-# Footer
-st.sidebar.divider()
-st.sidebar.caption(f"RAG-Destroyer Industrial | Build: {time.strftime('%Y%j')}")
-st.sidebar.caption("Privacy: Local Vault & API Keys are NOT shared with GitHub.")
-
-# PnP: remind trial users to set the key for the selected provider
-if not _provider_key_ready():
-    st.sidebar.warning("⚠️ API key: open **🛠️ System Config** and paste your key for the selected provider.")

@@ -10,3 +10,4 @@ requests
 watchdog
 openai
 anthropic
+fpdf2

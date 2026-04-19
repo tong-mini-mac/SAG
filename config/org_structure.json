@@ -1,50 +1,133 @@
 {
-    "business_type": "Digital Banking",
-    "hierarchy_levels": ["Level 1: Executive Board", "Level 2: C-Suite", "Level 3: Management", "Level 4: Supervisory", "Level 5: Execution"],
-    "departments": [
-        {
-            "name": "General",
-            "code": "GEN",
-            "keywords": ["Company", "Policy", "Holiday", "General", "HQ", "Public"],
-            "access_level": "PUBLIC"
-        },
-        {
-            "name": "Credit & Loans",
-            "code": "CRL",
-            "keywords": ["Loan", "Credit", "Mortgage", "Interest", "Financing", "Lending", "SME"],
-            "access_level": "RESTRICTED"
-        },
-        {
-            "name": "Operations",
-            "code": "OPS",
-            "keywords": ["Cash", "Branch", "Teller", "Atm", "Liquidity", "Vault", "Transaction"],
-            "access_level": "RESTRICTED"
-        },
-        {
-            "name": "IT & Digital",
-            "code": "ITD",
-            "keywords": ["App", "Security", "Server", "System", "Cyber", "Infrastructure", "Software"],
-            "access_level": "RESTRICTED"
-        },
-        {
-            "name": "HR & Admin",
-            "code": "HRA",
-            "keywords": ["Salary", "Welfare", "Training", "Employee", "Payroll", "Benefits", "Recruitment"],
-            "access_level": "RESTRICTED"
-        },
-        {
-            "name": "Risk & Compliance",
-            "code": "RSK",
-            "keywords": ["Audit", "Risk", "Law", "Fraud", "Investigation", "Legal", "Regulatory"],
-            "access_level": "RESTRICTED"
-        }
-    ],
-    "roles": [
-        { "role": "CEO (Chief Executive Officer)", "access": "ALL", "desc": "Master access to all departmental silos." },
-        { "role": "CFO (Chief Financial Officer)", "access": ["Credit & Loans", "Risk & Compliance", "General"], "desc": "Financial and Risk oversight access." },
-        { "role": "CTO (Chief Technology Officer)", "access": ["IT & Digital", "Operations", "General"], "desc": "Technology and Branch Operation oversight." },
-        { "role": "Department Head (VP)", "access": "SUBSET", "desc": "Restricted to their own department silo." },
-        { "role": "Operational Staff", "access": "SUBSET", "desc": "Restricted to their own department silo." }
-    ],
-    "users": []
+  "business_type": "Digital Banking",
+  "hierarchy_levels": [
+    "Level 1: Executive Board",
+    "Level 2: C-Suite",
+    "Level 3: Management",
+    "Level 4: Supervisory",
+    "Level 5: Execution"
+  ],
+  "departments": [
+    {
+      "name": "General",
+      "code": "GEN",
+      "keywords": [
+        "Company",
+        "Policy",
+        "Holiday",
+        "General",
+        "HQ",
+        "Public"
+      ],
+      "access_level": "PUBLIC"
+    },
+    {
+      "name": "Credit & Loans",
+      "code": "CRL",
+      "keywords": [
+        "Loan",
+        "Credit",
+        "Mortgage",
+        "Interest",
+        "Financing",
+        "Lending",
+        "SME"
+      ],
+      "access_level": "RESTRICTED"
+    },
+    {
+      "name": "Operations",
+      "code": "OPS",
+      "keywords": [
+        "Cash",
+        "Branch",
+        "Teller",
+        "Atm",
+        "Liquidity",
+        "Vault",
+        "Transaction"
+      ],
+      "access_level": "RESTRICTED"
+    },
+    {
+      "name": "IT & Digital",
+      "code": "ITD",
+      "keywords": [
+        "App",
+        "Security",
+        "Server",
+        "System",
+        "Cyber",
+        "Infrastructure",
+        "Software"
+      ],
+      "access_level": "RESTRICTED"
+    },
+    {
+      "name": "HR & Admin",
+      "code": "HRA",
+      "keywords": [
+        "Salary",
+        "Welfare",
+        "Training",
+        "Employee",
+        "Payroll",
+        "Benefits",
+        "Recruitment"
+      ],
+      "access_level": "RESTRICTED"
+    },
+    {
+      "name": "Risk & Compliance",
+      "code": "RSK",
+      "keywords": [
+        "Audit",
+        "Risk",
+        "Law",
+        "Fraud",
+        "Investigation",
+        "Legal",
+        "Regulatory"
+      ],
+      "access_level": "RESTRICTED"
+    }
+  ],
+  "roles": [
+    {
+      "role": "CEO (Chief Executive Officer)",
+      "access": "ALL",
+      "desc": "Master access to all departmental silos."
+    },
+    {
+      "role": "CFO (Chief Financial Officer)",
+      "access": [
+        "Credit & Loans",
+        "Risk & Compliance",
+        "General"
+      ],
+      "desc": "Financial and Risk oversight access."
+    },
+    {
+      "role": "CTO (Chief Technology Officer)",
+      "access": [
+        "IT & Digital",
+        "Operations",
+        "General"
+      ],
+      "desc": "Technology and Branch Operation oversight."
+    },
+    {
+      "role": "Department Head (VP)",
+      "access": "SUBSET",
+      "subset_include_general": true,
+      "desc": "Their department silo plus General (company-wide policies)."
+    },
+    {
+      "role": "Operational Staff",
+      "access": "SUBSET",
+      "subset_include_general": false,
+      "desc": "Their department silo only (no extra silos)."
+    }
+  ],
+  "users": []
 }

@@ -1,8 +1,32 @@
 import concurrent.futures
 import json
+import re
 from .Utils import LLMInterface, extract_json, CONFIG, NotificationManager
 from .SearchWorker import SearchWorker
 import time
+
+# Words too generic for substring search on short corporate summaries
+_QUERY_STOPWORDS = frozenset({
+    "how", "what", "when", "where", "why", "who", "which", "does", "did", "can", "could",
+    "would", "will", "should", "might", "must", "shall", "this", "that", "these", "those",
+    "the", "and", "for", "with", "from", "into", "your", "our", "their", "have", "been",
+    "there", "here", "also", "only", "just", "about", "please", "tell", "within", "scope",
+    "year", "month", "week", "day", "time", "make", "made", "need", "want", "like",
+})
+
+
+def _fallback_keywords_from_query(query: str) -> list[str]:
+    """Extract notable English tokens from the user query for literal vault substring search."""
+    words = re.findall(r"[A-Za-z]{3,}", (query or "").lower())
+    out = []
+    for w in words:
+        if w in _QUERY_STOPWORDS or w in out:
+            continue
+        out.append(w)
+        if len(out) >= 8:
+            break
+    return out
+
 
 class RAGOrchestrator:
     def __init__(self, vault_path=None):
@@ -17,26 +41,70 @@ class RAGOrchestrator:
         """AI Call 1: Strictly generates keywords from the command to save API costs."""
         system_instruction = """
         You are the 'RAG-Destroyer Semantic Swarm Engine'.
-        Your goal is to ensure high RECALL for a deterministic search.
-        1. Analyze the user query.
-        2. Generate 3-4 professional search keywords (English).
-        3. CRITICAL: Include semantic variations or synonyms if the term is ambiguous in corporate language.
-           (Example: 'Salary' -> ['Salary', 'Remuneration', 'Compensation', 'Pay Scale']).
+        Your goal is to ensure high RECALL for a deterministic substring search over English policy metadata (titles, tags, summaries).
+
+        1. Analyze the user query (any language).
+        2. Output 5-8 search terms as a JSON array of strings.
+        3. CRITICAL: Every string MUST be English only — words or short phrases likely to appear in English HR/finance/policy documents.
+        4. If the query is Thai, Japanese, or any non-English language, translate the concepts into English terms
+           (e.g. Thai asking about welfare/benefits → include "welfare", "benefits", "compensation", "employee", "policy", "allowance").
+        5. Include synonyms where helpful (e.g. salary → remuneration, compensation).
+        6. Do not output non-Latin script in the JSON array.
+
         Format: Return a JSON list of strings only.
         """
         raw = self.ai.call(query, system_instruction=system_instruction, json_mode=True)
         try:
-            return json.loads(extract_json(raw))
-        except:
-            return [query]
+            parsed = json.loads(extract_json(raw))
+            if isinstance(parsed, list):
+                return [str(x).strip() for x in parsed if str(x).strip()]
+            return []
+        except Exception:
+            return []
 
-    def execute_search(self, keywords, allowed_subsets):
+    def generate_keywords_multilingual_retry(self, query):
+        """Second pass: English-only tokens when the first keyword pass yields no vault hits."""
+        system_instruction = """
+        The vault stores English Markdown with English titles and summaries only.
+        The user may have asked in Thai or another language.
+
+        Return a JSON array of 8-12 English words (single words preferred) that would appear in HR/benefits/welfare policy titles,
+        such as: welfare, benefits, compensation, allowance, insurance, leave, payroll, employee, policy, review, annual, bonus, incentive.
+
+        Output JSON array of strings only. No Thai or non-English characters.
+        """
+        raw = self.ai.call(query, system_instruction=system_instruction, json_mode=True)
+        try:
+            parsed = json.loads(extract_json(raw))
+            if isinstance(parsed, list):
+                return [str(x).strip() for x in parsed if str(x).strip()]
+            return []
+        except Exception:
+            return []
+
+    @staticmethod
+    def _resolve_scope_display_name(authorized_scope, actual_subsets):
+        """Human-readable scope for prompts and apology lines (fixes list vs string edge cases)."""
+        if authorized_scope == "ALL":
+            return "the entire organization"
+        if isinstance(actual_subsets, list) and len(actual_subsets) == 1:
+            return actual_subsets[0]
+        if isinstance(actual_subsets, list) and len(actual_subsets) > 1:
+            return "the authorized silos (" + ", ".join(actual_subsets) + ")"
+        if isinstance(authorized_scope, str) and authorized_scope != "ALL":
+            return authorized_scope
+        return "your authorized scope"
+
+    def execute_search(self, keywords, allowed_subsets, viewer_role=None):
         """Spawns parallel search workers for each keyword."""
         all_results = []
         
         # Parallel execution of SearchWorker for each keyword
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_bots) as executor:
-            future_to_kw = {executor.submit(self.worker.search, kw, allowed_subsets): kw for kw in keywords}
+            future_to_kw = {
+                executor.submit(self.worker.search, kw, allowed_subsets, viewer_role): kw
+                for kw in keywords
+            }
             for future in concurrent.futures.as_completed(future_to_kw):
                 kw = future_to_kw[future]
                 try:
@@ -72,9 +140,14 @@ class RAGOrchestrator:
     def final_synthesis(self, query, context_docs, scope_name):
         """Final GURU synthesis using authorized expert reasoning."""
         if not context_docs:
-            return f"I apologize, as the GURU for {scope_name}, I could not find the information you requested within my authorized scope."
+            return (
+                f"I apologize. Within **{scope_name}**, I could not retrieve any documents whose "
+                "title, tags, or summary matched the search terms derived from your question. "
+                "Please rephrase using vocabulary that appears in your policies, or confirm the "
+                "vault index is up to date (**System Config → Rebuild vault index**)."
+            )
 
-        # Prepare context text with token efficiency
+        # Prepare context text for token efficiency
         context_text = ""
         for i, doc in enumerate(context_docs):
             try:
@@ -114,19 +187,10 @@ class RAGOrchestrator:
         
         return refined_report
 
-    def handle_request(self, query, authorized_scope):
+    def handle_request(self, query, authorized_scope, viewer_role=None):
         """Main Pipeline: AI (Keywords) -> Code (Parallel Search/Subset) -> AI (GURU Synthesis)."""
         # Refresh client in case of provider switch in UI
         self.ai = LLMInterface.get_client()
-        
-        scope_name = "your department" if authorized_scope != "ALL" else "the entire organization"
-        if isinstance(authorized_scope, str) and authorized_scope != "ALL":
-             scope_name = f"the {authorized_scope} scope"
-
-        print(f"🧠 GURU processing: '{query}' within {scope_name}")
-        
-        # 1. AI Call 1: Generate Keywords
-        keywords = self.generate_keywords(query)
         
         # Determine subsets based on security context (Individual or Department)
         if isinstance(authorized_scope, list) or authorized_scope == "ALL":
@@ -134,13 +198,41 @@ class RAGOrchestrator:
         else:
             actual_subsets = [authorized_scope]
 
+        scope_name = self._resolve_scope_display_name(authorized_scope, actual_subsets)
+
+        print(f"🧠 GURU processing: '{query}' within {scope_name}")
+        
+        # 1. AI Call 1: Generate Keywords — merge with query tokens for substring recall
+        keywords = self.generate_keywords(query)
+        merged = []
+        for k in keywords + _fallback_keywords_from_query(query):
+            if isinstance(k, str) and k.strip():
+                ks = k.strip()
+                if ks.lower() not in [x.lower() for x in merged]:
+                    merged.append(ks)
+        keywords = merged[:14]
+
         print(f"🔑 Search Strategy: {keywords}")
         
         # 2. Local Code Execution: Parallel Search (Silo-Restricted)
-        search_results = self.execute_search(keywords, actual_subsets)
+        search_results = self.execute_search(keywords, actual_subsets, viewer_role)
         
         # 3. Local Code Execution: Expert Subset Selection
         best_context = self.calculate_best_subset(search_results)
+        # Thai / multilingual queries: first pass may return nothing — broaden English keywords once
+        if not best_context:
+            retry_kw = self.generate_keywords_multilingual_retry(query)
+            merged2 = []
+            for k in keywords + retry_kw + _fallback_keywords_from_query(query):
+                if isinstance(k, str) and k.strip():
+                    ks = k.strip()
+                    if ks.lower() not in [x.lower() for x in merged2]:
+                        merged2.append(ks)
+            keywords = merged2[:18]
+            print(f"🔁 Retry search keywords: {keywords}")
+            search_results = self.execute_search(keywords, actual_subsets, viewer_role)
+            best_context = self.calculate_best_subset(search_results)
+
         print(f"📊 GURU found {len(best_context)} key references.")
         
         # 4. AI Call 2: Final GURU Expert Synthesis
