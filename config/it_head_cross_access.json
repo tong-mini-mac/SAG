@@ -1,0 +1,31 @@
+{
+  "merge_it_for_heads_of": [
+    "Credit & Loans",
+    "HR & Admin",
+    "Operations",
+    "Risk & Compliance"
+  ],
+  "allowed_cross_basenames": [
+    "demo_security_notice.md",
+    "[ITD-001] IT Security and Operations Protocol.md",
+    "[ITD-005] IT_System_Optimization_and_Security_Guidelines.md",
+    "[ITD-034] IT_Digital_Quarterly_Deployment_and_Monitoring_Plan.md",
+    "[ITD-078] ITD Quarterly System Maintenance Tasks.md"
+  ],
+  "risk_only_extra_basenames": [
+    "[ITS-001] Mobile_Banking_Security_Plan_v5.0.md",
+    "[ITD-033] ITD Audit Findings and Security Review.md",
+    "[ITD-092] IT System Security Audit Review.md"
+  ],
+  "explicit_cross_deny_basenames": [
+    "[ITD-044] ITD Encryption Standards and Firewall Review Bug Report.md"
+  ],
+  "deny_substrings_in_basename_case_insensitive": [
+    "Database Migration",
+    "System Architecture",
+    "Firewall",
+    "API Latency",
+    "Encryption Standards",
+    "Bug Report"
+  ]
+}

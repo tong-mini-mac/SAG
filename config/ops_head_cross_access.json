@@ -1,0 +1,47 @@
+{
+  "merge_ops_for_heads_of": [
+    "Credit & Loans",
+    "HR & Admin",
+    "IT & Digital",
+    "Risk & Compliance"
+  ],
+  "allowed_cross_basenames": [
+    "[OPS-002] Marketing_Strategy_Plan_BE2569.md",
+    "[OPS-018] Operations 2026 Strategy Performance Review.md",
+    "[OPS-026] Operations Performance Optimization Strategy 2026.md",
+    "[OPS-094] Operations 2026 Strategy Performance and Efficiency Update.md",
+    "[OPS-006] Operations Service Standards and Efficiency Guidelines.md",
+    "[OPS-050] Customer Wait Time and Branch Efficiency Standards.md",
+    "[OPS-072] Operations Performance Monitoring Standards.md",
+    "[OPS-074] Cash Flow Management and Optimization Guidelines.md",
+    "[OPS-001] Siam_Paragon_Branch_Daily_Close_Report.md"
+  ],
+  "explicit_cross_deny_basenames": [
+    "[OPS-036] Operations Branch Efficiency and Performance Monitoring Log.md",
+    "[OPS-096] Operations Performance and Efficiency Log.md"
+  ],
+  "risk_only_extra_basenames": [
+    "[OPS-004] Branch Performance and Efficiency Audit.md",
+    "[OPS-030] Teller Performance and Customer Wait Time Investigation.md"
+  ],
+  "risk_allow_substrings_in_basename_case_insensitive": [
+    "Audit",
+    "Investigation",
+    "Cash Flow Review"
+  ],
+  "hr_allow_substrings_in_basename_case_insensitive": [
+    "Teller Performance Summary",
+    "Aggregate Teller Performance",
+    "Aggregate Employee Performance"
+  ],
+  "deny_substrings_in_basename_case_insensitive": [
+    "Teller Performance Review",
+    "Branch Efficiency Report",
+    "Cash Flow Review",
+    "Monitoring Log",
+    "Efficiency Log"
+  ],
+  "risk_exempt_deny_substrings": [
+    "Cash Flow Review"
+  ]
+}

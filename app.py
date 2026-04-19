@@ -19,6 +19,12 @@ from core.Utils import (
     LLMInterface,
     vault_doc_counts_for_departments,
     list_authorized_vault_documents,
+    maybe_seed_demo_vault,
+    merge_credit_cross_access_subset,
+    merge_hr_cross_access_subset,
+    merge_it_cross_access_subset,
+    merge_ops_cross_access_subset,
+    merge_risk_silo_cross_access_subset,
 )
 import threading
 
@@ -194,6 +200,13 @@ def render_api_and_model_form(*, compact: bool = False, key_prefix: str = "gate"
                 st.rerun()
 
 
+if maybe_seed_demo_vault(ROOT_PATH, CONFIG["CLEANED_DATA_PATH"]):
+    try:
+        VaultWarden(CONFIG["CLEANED_DATA_PATH"]).audit_and_index()
+        st.session_state["_demo_seed_notice"] = True
+    except Exception as exc:
+        print(f"[app] Demo vault index after auto-seed failed: {exc}")
+
 services = get_services()
 
 if "monitor_running" not in st.session_state:
@@ -206,6 +219,11 @@ if "current_result" not in st.session_state:
 
 # Sidebar Navigation
 st.sidebar.title("Menu")
+if st.session_state.pop("_demo_seed_notice", False):
+    st.sidebar.success(
+        "Setup: bundled **demo_knowledge/** was copied into **knowledge/** and indexed. "
+        "Replace with your own vault anytime."
+    )
 
 PAGES = [
     "🔑 Start",
@@ -305,6 +323,7 @@ elif page == "🧠 GURU Assistant":
 
     role_info = next((r for r in org_config.get("roles", []) if r["role"] == selected_role), {})
     role_access = role_info.get("access", "SUBSET")
+    selected_dept = None
 
     if role_access == "ALL":
         with col_d:
@@ -365,16 +384,38 @@ elif page == "🧠 GURU Assistant":
             else:
                 st.info(f"📁 **{selected_role}** — **{selected_dept}** (~{_n} docs)")
 
+    allowed_search_subsets = merge_credit_cross_access_subset(
+        allowed_search_subsets, selected_role, selected_dept
+    )
+    allowed_search_subsets = merge_hr_cross_access_subset(
+        allowed_search_subsets, selected_role, selected_dept
+    )
+    allowed_search_subsets = merge_it_cross_access_subset(
+        allowed_search_subsets, selected_role, selected_dept
+    )
+    allowed_search_subsets = merge_ops_cross_access_subset(
+        allowed_search_subsets, selected_role, selected_dept
+    )
+    allowed_search_subsets = merge_risk_silo_cross_access_subset(
+        allowed_search_subsets, selected_role, selected_dept
+    )
+
     auth_doc_rows = list_authorized_vault_documents(
         CONFIG["CLEANED_DATA_PATH"],
         allowed_search_subsets,
         depts,
         viewer_role=selected_role,
+        viewer_active_department=selected_dept,
     )
     st.markdown("##### Documents available to this identity (for drafting questions)")
     st.caption(
-        "Preview matches search/GURU. Optional YAML frontmatter: **audience: management** "
-        "= head/C-suite only (hidden from Operational Staff in the same silo). Column **Audience** shows level."
+        "Preview matches search/GURU. **Department Head (non-Credit):** added **Credit** silo — "
+        "`config/credit_head_cross_access.json`. **Risk** head: near–full Credit. "
+        "**Department Head (non-HR):** added **HR & Admin** — "
+        "`config/hr_head_cross_access.json`. **Department Head (non-IT):** added **IT & Digital** — "
+        "`config/it_head_cross_access.json`. **Department Head (non-Operations):** added **Operations** — "
+        "`config/ops_head_cross_access.json`. **Department Head (non-Risk):** added **Risk & Compliance** — "
+        "`config/risk_silo_cross_access.json`. Optional YAML **audience: management**; column **Audience**."
     )
     if auth_doc_rows:
         st.dataframe(
@@ -410,7 +451,10 @@ elif page == "🧠 GURU Assistant":
                 time.sleep(1)
                 st.write("🤖 Dispatches Parallel Bots...")
                 result = services["orchestrator"].handle_request(
-                    query, allowed_search_subsets, selected_role
+                    query,
+                    allowed_search_subsets,
+                    selected_role,
+                    viewer_active_department=selected_dept,
                 )
                 st.session_state.last_query = query
 

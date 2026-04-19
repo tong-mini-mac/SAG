@@ -95,14 +95,20 @@ class RAGOrchestrator:
             return authorized_scope
         return "your authorized scope"
 
-    def execute_search(self, keywords, allowed_subsets, viewer_role=None):
+    def execute_search(self, keywords, allowed_subsets, viewer_role=None, viewer_active_department=None):
         """Spawns parallel search workers for each keyword."""
         all_results = []
         
         # Parallel execution of SearchWorker for each keyword
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_bots) as executor:
             future_to_kw = {
-                executor.submit(self.worker.search, kw, allowed_subsets, viewer_role): kw
+                executor.submit(
+                    self.worker.search,
+                    kw,
+                    allowed_subsets,
+                    viewer_role,
+                    viewer_active_department,
+                ): kw
                 for kw in keywords
             }
             for future in concurrent.futures.as_completed(future_to_kw):
@@ -187,7 +193,7 @@ class RAGOrchestrator:
         
         return refined_report
 
-    def handle_request(self, query, authorized_scope, viewer_role=None):
+    def handle_request(self, query, authorized_scope, viewer_role=None, viewer_active_department=None):
         """Main Pipeline: AI (Keywords) -> Code (Parallel Search/Subset) -> AI (GURU Synthesis)."""
         # Refresh client in case of provider switch in UI
         self.ai = LLMInterface.get_client()
@@ -215,7 +221,9 @@ class RAGOrchestrator:
         print(f"🔑 Search Strategy: {keywords}")
         
         # 2. Local Code Execution: Parallel Search (Silo-Restricted)
-        search_results = self.execute_search(keywords, actual_subsets, viewer_role)
+        search_results = self.execute_search(
+            keywords, actual_subsets, viewer_role, viewer_active_department
+        )
         
         # 3. Local Code Execution: Expert Subset Selection
         best_context = self.calculate_best_subset(search_results)
@@ -230,7 +238,9 @@ class RAGOrchestrator:
                         merged2.append(ks)
             keywords = merged2[:18]
             print(f"🔁 Retry search keywords: {keywords}")
-            search_results = self.execute_search(keywords, actual_subsets, viewer_role)
+            search_results = self.execute_search(
+                keywords, actual_subsets, viewer_role, viewer_active_department
+            )
             best_context = self.calculate_best_subset(search_results)
 
         print(f"📊 GURU found {len(best_context)} key references.")

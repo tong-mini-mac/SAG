@@ -9,7 +9,7 @@
 > *"An LLM is the CPU of an emerging operating system."* — **Andrej Karpathy**
 
 ### 💡 Inspiration: Standing on the Shoulders of Giants
-This project exists because of **Andrej Karpathy's** brilliant vision of the "LLM OS". He proposed that an LLM shouldn't just be a chatbot, but the core processor of a new operating system—capable of reading files, managing memory, and respecting user permissions natively. 
+This project exists because of **Andrej Karpathy's** brilliant vision of the "LLM OS". He proposed that an LLM shouldn't just be a chatbot, but the core processor of a new operating system—capable of reading files, managing memory, and respecting user permissions natively.
 
 While the AI industry rushed to dump enterprise data into complex, multi-million dollar, black-box Vector Databases, they forgot the fundamental requirement of any Operating System: **A deterministic, permission-aware File System.**
 
@@ -26,7 +26,7 @@ I am not looking for profit or a commercial software license. My only objective 
 
 **The theory is proven. The foundation is here.**
 
-This repository is provided as an open-source foundation. You are free to take this architecture, adapt it, integrate it with your enterprise's complex RBAC (Active Directory, OAuth, etc.), and scale it for your own needs. 
+This repository is provided as an open-source foundation. You are free to take this architecture, adapt it, integrate it with your enterprise's complex RBAC (Active Directory, OAuth, etc.), and scale it for your own needs.
 
 *The framework is public. The proof is undeniable. The implementation is now yours.*
 
@@ -61,6 +61,7 @@ We got so obsessed with shiny Vector DBs and complex embeddings that we forgot b
 - **Multi-threaded Speed:** Parallel worker agents (optimized swarm) scout the vault in milliseconds.
 - **Industrial Resilience**: Integrated Safety-Cut (Circuit Breaker) and Industrial Operational Watchdog.
 - **Demo Audit Layer**: AI-on-AI QC Judging and Performance Dashboard (Built for continuous improvement).
+- **Layered cross-silo access for VPs:** Department Heads can receive *merged* silo search scope with per-file policies (whitelist / deny / substring rules) — see **§ Organization model** below.
 
 ---
 
@@ -71,6 +72,77 @@ We got so obsessed with shiny Vector DBs and complex embeddings that we forgot b
 > 2. **No Vault Access**: The `.obsidian/` folder and `knowledge/` (Markdown Silos) are strictly ignored via `.gitignore`.
 > 3. **Google Drive Isolation**: Local CloudStorage paths are never uploaded.
 > 4. **Audit Logs**: Demo audit logs used for code refinement are kept local to the developer environment.
+
+---
+
+## 🏢 Organization model: silos, roles (CEO → Operational Staff), and cross-merge
+
+The **subset** enforced at query time uses `config/org_structure.json`, `core/Utils.py` (`document_visible_to_viewer`), YAML `audience` in front matter (e.g. `management`), and optional config files listed below.
+
+### Department silos (folder names under `knowledge/`)
+
+These must match the `name` field for each department in **`config/org_structure.json`**.
+
+| Silo | Code | Focus |
+|------|------|--------|
+| **General** | GEN | Company-wide / HQ policies |
+| **Credit & Loans** | CRL | Lending |
+| **Operations** | OPS | Branches / operations |
+| **IT & Digital** | ITD | Technology & digital |
+| **HR & Admin** | HRA | HR & admin |
+| **Risk & Compliance** | RSK | Risk & compliance |
+
+### Role → search scope (vault)
+
+| Role | Search scope | Notes |
+|------|----------------|-------|
+| **CEO** | **ALL** silos | Full vault; still respects YAML `audience` when set. |
+| **CFO** | **Credit & Loans**, **Risk & Compliance**, **General** | Fixed list in `org_structure.json`. |
+| **CTO** | **IT & Digital**, **Operations**, **General** | Fixed list in `org_structure.json`. |
+| **Department Head (VP)** | **Selected department + General** (`subset_include_general: true`) **plus merged silos** (see below) **and** per-file filtering. |
+| **Operational Staff** | **Selected department only** (no General by default) | Extra per-department **denylist** in `config/operational_staff_vault_denylist.json`. |
+
+Operational Staff (and roles with a single silo) **do not** see `audience: management` documents unless the role is treated as management in code.
+
+### Cross-silo merge (Department Head only)
+
+For **Department Head (VP)** the app expands the allowed folder list **after** `[department, General]` using, **in order**:
+
+1. `merge_credit_cross_access_subset` → `config/credit_head_cross_access.json`
+2. `merge_hr_cross_access_subset` → `config/hr_head_cross_access.json`
+3. `merge_it_cross_access_subset` → `config/it_head_cross_access.json`
+4. `merge_ops_cross_access_subset` → `config/ops_head_cross_access.json`
+5. `merge_risk_silo_cross_access_subset` → `config/risk_silo_cross_access.json`
+
+Each step **appends** a silo folder name when the viewer’s active department is in that config’s merge list **and is not** the silo owner (no duplicate append). **CEO / CFO / CTO** paths that are already `ALL` or fixed lists **do not** use this merge chain.
+
+**Search** still applies **`document_visible_to_viewer`** per file (whitelist, explicit deny, substring rules, Risk/HR/Ops extras, universal-read basenames, auditee audit-report lists, etc.).
+
+| If the Head’s active department is… | Extra silo merged in (when not already that silo) | Mechanism (high level) |
+|-------------------------------------|---------------------------------------------------|-------------------------|
+| Not **Credit & Loans** | **Credit & Loans** | Credit policy/strategy allowlists; Operations gets extra basenames per `credit_head_cross_access.json`. |
+| Not **HR & Admin** | **HR & Admin** | Whitelist + explicit deny (`hr_head_cross_access.json`). |
+| Not **IT & Digital** | **IT & Digital** | Whitelist + Risk-only extras + substring deny on basenames (`it_head_cross_access.json`). |
+| Not **Operations** | **Operations** | Whitelist + HR substring / Risk expansion + denies (`ops_head_cross_access.json`). |
+| Not **Risk & Compliance** | **Risk & Compliance** | Whitelist + IT/Ops AML extras + optional auditee reports per department (`risk_silo_cross_access.json`). |
+
+### Related config files
+
+| File | Purpose |
+|------|---------|
+| `config/org_structure.json` | Departments & base role access. |
+| `config/universal_read_basenames.json` | Basenames readable across allowed silos (extra visibility rules). |
+| `config/credit_head_cross_access.json` | Merge Credit + policy/strategy file lists. |
+| `config/hr_head_cross_access.json` | Merge HR + cross-read rules. |
+| `config/it_head_cross_access.json` | Merge IT + Risk-only extras + deny patterns. |
+| `config/ops_head_cross_access.json` | Merge Operations + HR/Risk extensions. |
+| `config/risk_silo_cross_access.json` | Merge Risk + AML/auditee rules. |
+| `config/operational_staff_vault_denylist.json` | Blocks specific basenames for Operational Staff by silo. |
+
+### Index & regression
+
+- After bulk changes under `knowledge/`, use **🛠️ System Config → Rebuild vault index & search cache** (`_SEARCH_CACHE.json`, `_MASTER_INDEX.md`).
+- Example script for merge scope: `scripts/test_merge_cross_silo.py`.
 
 ---
 
@@ -93,7 +165,7 @@ Everything below uses defaults from `core/Utils.py`. Override paths with environ
 With Streamlit running, the **background monitor** watches `raw_data/`. **`DataRefinery`** calls your **LLM** to classify content, suggest a filename, and write **Markdown + YAML front matter** straight into **`knowledge/<Department>/`**. No second staging folder. **Obsidian does not run this step** and never receives raw drops.
 
 **Subset (who sees what)**  
-“Subset” is enforced at **query time** in Python: allowed **department folders** under `knowledge/`, using `config/org_structure.json` and the role you pick in the UI (`SearchWorker` / `RAGOrchestrator`). **Obsidian does not split subsets.** Optionally open `knowledge/` in Obsidian **after** files exist to edit, link, or tag—folder names must still match silos.
+“Subset” is enforced at **query time** in Python: allowed **department folders** under `knowledge/`, using `config/org_structure.json` and the role you pick in the UI (`SearchWorker` / `RAGOrchestrator`). **Department Heads** additionally get **merged silos** and **per-file RBAC** as described in **§ Organization model**. **Obsidian does not split subsets.** Optionally open `knowledge/` in Obsidian **after** files exist to edit, link, or tag—folder names must still match silos.
 
 | How `.md` gets into `knowledge/` | Details |
 | :--- | :--- |
@@ -172,7 +244,7 @@ Complete **steps 1–6** first; then apply this checklist as needed.
 
 ### Obsidian (optional reminder)
 
-- **Trial with pre-cleaned Markdown:** Obsidian **not required**—the app only reads files on disk.  
+- **Trial with pre-cleaned Markdown:** Obsidian **not required**—the app only reads files on disk.
 - **Ongoing editing:** Many teams open `knowledge/` as an [Obsidian](https://obsidian.md/) vault for links/tags/graph; others use VS Code/Cursor. `.obsidian/` remains gitignored.
 
 ### 4) Configuration extras (CLI / persistence)
@@ -197,4 +269,4 @@ You do **not** need `config/.env` to open the UI—see **§2 step 3** above for 
 **Built with respect for the craft.**
 *Architected by RAG Slayer in Bangkok, Thailand.* 🇹🇭
 
-*PS. https://www.linkedin.com/in/vittaya-lertbuiasin-13b258149/
+*PS. https://www.linkedin.com/in/vittaya-lertbuiasin-13b258149/*

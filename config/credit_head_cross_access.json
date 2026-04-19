@@ -1,0 +1,20 @@
+{
+  "merge_credit_for_heads_of": [
+    "HR & Admin",
+    "IT & Digital",
+    "Operations",
+    "Risk & Compliance"
+  ],
+  "policy_strategy_basenames": [
+    "demo_credit_policy.md",
+    "[DRM-001] Default Risk Management Policy.md",
+    "[CRL-041] Lending Collateral Management Policy.md",
+    "[CRL-042] Lending Policy 2026 Strategy Update.md",
+    "[CRL-060] Credit Risk Assessment 2026 Strategy.md",
+    "[CRL-082] Loan Strategy 2026 Review.md",
+    "[CRL-093] Loan Portfolio Optimization and Risk Management Strategy 2026.md"
+  ],
+  "operations_extra_basenames": [
+    "[CRL-035] Lending Policy Review and Monitoring Guidelines.md"
+  ]
+}
