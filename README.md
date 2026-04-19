@@ -75,6 +75,31 @@ We got so obsessed with shiny Vector DBs and complex embeddings that we forgot b
 
 ---
 
+## 👥 Getting the code (evaluators, testers, forks)
+
+You can download and run this project **without being the maintainer**.
+
+| Method | What to do |
+| :--- | :--- |
+| **Git clone** | `git clone https://github.com/tong-mini-mac/RAG-Destroyer.git` then follow **§ Quick start** below. |
+| **ZIP** | On GitHub: **Code → Download ZIP**, extract, then open a terminal in that folder. |
+
+### What testers and evaluators should know
+
+Tell anyone trying the demo the following:
+
+1. **There is no `knowledge/` vault inside the repo.** It is **gitignored** on purpose (**privacy policy** — see **Data Privacy & GitHub Policy** above). After `git clone` or unzipping, **you must supply Markdown yourself**: build **`knowledge/<Department>/`** to match **`config/org_structure.json`**, **or** copy from the repo’s **`demo_knowledge/`** into **`knowledge/`** as described in this README (**same folder names as department silos**).
+
+2. **Automatic demo seed (optional):** If **`knowledge/`** has **no** `.md` files yet and **`demo_knowledge/`** exists next to the app, **`maybe_seed_demo_vault`** (`core/Utils.py`) may copy **`demo_knowledge/` → `knowledge/`** on startup. Create **`knowledge/.no_auto_demo`** to disable that behaviour.
+
+3. **API keys (BYOK):** Bring **your own** LLM credentials. Enter them in the Streamlit UI or **`config/.env`** (see **Quick start §2** and **`config/.env.example`**).
+
+4. **Repository access:** If this GitHub repo is **public**, anyone can clone or download the ZIP. If it is **private**, only **invited users** or accounts **granted access** can clone or pull.
+
+**In short:** testers get the **code** via **`git clone`** or **ZIP**. Whether that works **without extra GitHub login** depends on **public vs private**. They always need to **prepare a vault under `knowledge/`** (manually, from **`demo_knowledge/`**, or via **auto-seed**) and **their own API key**.
+
+---
+
 ## 🏢 Organization model: silos, roles (CEO → Operational Staff), and cross-merge
 
 The **subset** enforced at query time uses `config/org_structure.json`, `core/Utils.py` (`document_visible_to_viewer`), YAML `audience` in front matter (e.g. `management`), and optional config files listed below.
