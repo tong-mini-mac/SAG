@@ -1,0 +1,31 @@
+# RAG-Destroyer — local run with bind mounts for vault + drop zone
+# Usage:
+#   cp config/.env.example config/.env   # then edit keys
+#   mkdir -p knowledge raw_data logs
+#   docker compose up --build
+#
+# UI: http://localhost:8501
+
+services:
+  rag-destroyer:
+    build: .
+    image: rag-destroyer:local
+    ports:
+      - "8501:8501"
+    # Create from config/.env.example if missing: cp config/.env.example config/.env
+    env_file:
+      - config/.env
+    environment:
+      # Optional overrides (Compose substitutes from host env if set)
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LINE_NOTIFY_TOKEN: ${LINE_NOTIFY_TOKEN:-}
+      RAW_DATA_PATH: /app/raw_data
+      CLEANED_DATA_PATH: /app/knowledge
+    volumes:
+      - ./knowledge:/app/knowledge
+      - ./raw_data:/app/raw_data
+      - ./logs:/app/logs
+    restart: unless-stopped

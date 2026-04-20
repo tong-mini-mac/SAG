@@ -2,6 +2,7 @@
   <img src="docs/img/architecture.png" width="100%" alt="RAG-Destroyer: Obsidian Graph x Subset Architecture">
   <h1>🏛️ RAG-Destroyer: The Zero-Vector-DB Architecture</h1>
   <p><b>Deterministic Knowledge Retrieval for the LLM OS Era</b></p>
+  <p><i>Repository documentation is maintained in English.</i></p>
 </div>
 
 <br>
@@ -13,7 +14,7 @@ This project exists because of **Andrej Karpathy's** brilliant vision of the "LL
 
 While the AI industry rushed to dump enterprise data into complex, multi-million dollar, black-box Vector Databases, they forgot the fundamental requirement of any Operating System: **A deterministic, permission-aware File System.**
 
-**RAG-Destroyer** (Lom RAG) is my humble attempt to build that missing layer.
+**RAG-Destroyer** (nickname *Lom RAG*: a Thai shorthand for pushing back on naive "dump everything into vectors" RAG) is my humble attempt to build that missing layer.
 
 ---
 
@@ -22,7 +23,7 @@ While the AI industry rushed to dump enterprise data into complex, multi-million
 
 The goal of **RAG-Destroyer** is to serve as a **Proof of Concept (PoC)** to demonstrate a singular truth: *A deterministic, Zero-Vector-DB architecture using the "Subset Theory" can eliminate Data Leakage and Hallucination in high-security environments.*
 
-I am not looking for profit or a commercial software license. My only objective was to prove that this architectural approach—the "Lom RAG" philosophy—is the correct foundation for enterprise-grade AI security.
+I am not looking for profit or a commercial software license. My only objective was to prove that this architectural approach—the anti-vector-overkill philosophy described above—is the correct foundation for enterprise-grade AI security.
 
 **The theory is proven. The foundation is here.**
 
@@ -59,52 +60,94 @@ We got so obsessed with shiny Vector DBs and complex embeddings that we forgot b
 - **100% Native RBAC:** Inherits your organizational silo permissions automatically.
 - **Zero Hallucination Retrieval:** If the deterministic search doesn't find it, it doesn't get synthesized.
 - **Multi-threaded Speed:** Parallel worker agents (optimized swarm) scout the vault in milliseconds.
-- **Industrial Resilience**: Integrated Safety-Cut (Circuit Breaker) and Industrial Operational Watchdog.
-- **Demo Audit Layer**: AI-on-AI QC Judging and Performance Dashboard (Built for continuous improvement).
+- **Industrial Resilience:** Integrated safety cut (circuit breaker) and industrial operational watchdog.
+- **Demo Audit Layer:** AI-on-AI QC judging and performance dashboard (built for continuous improvement).
 
 ---
 
-## 🛡️ Data Privacy & GitHub Policy
+## 🛡️ Data privacy, `knowledge/`, and what belongs on GitHub
+
 > [!WARNING]
-> This repository contains **Zero Private Data**.
-> 1. **Code Only**: Only the core orchestration, logic, and UI code is maintained on GitHub.
-> 2. **No Vault Access**: The `.obsidian/` folder and `knowledge/` (Markdown Silos) are strictly ignored via `.gitignore`.
-> 3. **Google Drive Isolation**: Local CloudStorage paths are never uploaded.
-> 4. **Audit Logs**: Demo audit logs used for code refinement are kept local to the developer environment.
+> **Public GitHub = application code only.** Treat your Markdown vault as **data**, not as part of the public template.
+
+| Location | Typical contents | On public GitHub? |
+| :--- | :--- | :--- |
+| Repo root (`app.py`, `core/`, `docs/`, Docker files, `config/.env.example`) | Orchestration, UI, docs | **Yes** — safe to push |
+| `config/.env` | API keys, tokens | **Never** — gitignored; copy from `config/.env.example` |
+| `knowledge/` | Markdown silos ("vault"), RBAC-sensitive text | **No** (default) — `.gitignore` keeps it local / on your machine only |
+| `raw_data/` | Drop zone for ingestion | **No** — gitignored |
+| `logs/` | Runtime / audit JSON | **No** — gitignored |
+| `.obsidian/` | Obsidian workspace metadata | **No** — gitignored |
+
+**Why not push `knowledge/` to a public repo?**  
+Once pushed, content is **copied forever** across forks, clones, and search indexes. Enterprise playbooks, customer names, or policy drafts do not belong next to open-source code unless you have explicitly cleared legal + security review.
+
+**If you truly need Git-backed vaults:**
+
+- **Private repository** (org-only) + branch protections — still treat as sensitive; rotate anything that ever leaked to a public remote by mistake.
+- **Separate private repo** for `knowledge/` only (or Git submodule) so the public RAG-Destroyer repo stays code-only.
+- **No Git at all for vault:** keep `knowledge/` on disk, NAS, S3, or Google Drive — the **Docker Compose** setup bind-mounts `./knowledge` and `./raw_data` from the host; the container never required the vault to live inside the image.
+
+**Google Drive / local paths:** Never commit machine-specific absolute paths or synced folders that contain private files.
 
 ---
 
 ## 🛠️ Tech Stack & Quick Start
 
-### Installation
+### Option A — Docker (recommended)
+
+Prerequisites: [Docker](https://docs.docker.com/get-docker/) + [Docker Compose v2](https://docs.docker.com/compose/).
+
+```bash
+git clone https://github.com/vittaya1973/RAG-Destroyer.git
+cd RAG-Destroyer
+cp config/.env.example config/.env
+# Edit config/.env — set at least GEMINI_API_KEY (or keys for the provider you select in the UI)
+
+mkdir -p knowledge raw_data logs
+docker compose up --build
+```
+
+Open **http://localhost:8501**
+
+- **Secrets:** real keys live only in `config/.env` (gitignored). Do not commit `.env`.
+- **Vault / uploads:** `knowledge/` and `raw_data/` are **bind-mounted** from your host; data persists when the container stops. Populate `knowledge/` on the host (Obsidian vault, rsync, etc.) — nothing in that folder is required inside the GitHub repo.
+- **Compose env:** `docker compose` loads `config/.env`. The file must exist (even with placeholders); create it with `cp` as above.
+
+### Option B — Local Python
+
+Requires **Python 3.9+** (Dockerfile uses **3.11** for parity).
+
 ```bash
 git clone https://github.com/vittaya1973/RAG-Destroyer.git
 cd RAG-Destroyer
 pip install -r requirements.txt
+cp config/.env.example config/.env
+# Edit config/.env
+mkdir -p knowledge raw_data logs
+streamlit run app.py
 ```
 
-### Configuration
-Update `config/.env` with your API keys:
+### Configuration (`config/.env`)
+
+See `config/.env.example`. Common entries:
+
 ```env
 GEMINI_API_KEY=your_key_here
 GEMINI_MODEL=gemini-2.5-flash
 LINE_NOTIFY_TOKEN=Optional_Token
 ```
 
-### Run the UI
-```bash
-streamlit run app.py
-```
-
 | Category | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Orchestration** | `Python 3.9+` | Core control logic |
-| **Logic Layer** | `Gemini 2.5 Flash` | Query interpretation & response synthesis |
-| **Storage** | `Obsidian (Markdown)` | Distributed knowledge vault |
+| **Packaging** | `Docker` + Compose | Reproducible runtime; host-mounted vault |
+| **Orchestration** | `Python 3.9+` (3.11 in Docker) | Core control logic |
+| **Logic Layer** | `Gemini 2.5 Flash` (+ optional providers in UI) | Query interpretation & response synthesis |
+| **Storage** | `Obsidian (Markdown)` in `knowledge/` | Distributed knowledge vault (local/private) |
 | **UI Framework** | `Streamlit` | Enterprise Guru dashboard |
-| **Resilience** | `Industrial Watchdog` | PID Lock, Auto-Recovery, & LINE Notify |
+| **Resilience** | `Industrial Watchdog` | PID lock, auto-recovery, optional LINE Notify |
 
 ---
 
-**Built with respect for the craft.**
-*Architected by RAG Slayer in Bangkok, Thailand.* 🇹🇭
+**Built with respect for the craft.**  
+*Architected by RAG Slayer (Bangkok, Thailand).*

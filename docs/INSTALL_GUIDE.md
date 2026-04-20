@@ -1,5 +1,7 @@
 # 🛠️ RAG-Destroyer: Installation & Setup Guide
 
+*This guide is written in English.*
+
 Welcome to the **Industrial RAG-Destroyer (Zero-Vector-DB)**. This guide will help you set up the system from scratch in less than 5 minutes.
 
 ---

@@ -1,0 +1,23 @@
+# Git & Python
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.venv
+venv
+.env
+.DS_Store
+
+# Secrets (never bake into image)
+config/.env
+
+# Runtime / local vault — supplied via bind mounts
+knowledge
+raw_data
+logs
+output
+.monitor.pid
+
+# Large local evidence (not needed inside container at runtime)
+industrial_evidence
