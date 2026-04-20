@@ -8,4 +8,6 @@ python-docx
 openpyxl
 requests
 watchdog
+openai
+anthropic
 fpdf2

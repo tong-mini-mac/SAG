@@ -1,0 +1,4 @@
+# Hide Streamlit's Deploy / developer toolbar on localhost (not part of this app).
+# https://docs.streamlit.io/develop/api-reference/configuration/config.toml
+[client]
+toolbarMode = "viewer"

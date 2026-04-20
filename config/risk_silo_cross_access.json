@@ -1,0 +1,37 @@
+{
+  "merge_risk_silo_for_heads_of": [
+    "Credit & Loans",
+    "HR & Admin",
+    "IT & Digital",
+    "Operations"
+  ],
+  "allowed_cross_basenames": [
+    "[RSK-020] Risk Monitoring and Regulatory Compliance Guidelines.md",
+    "[RSK-077] Compliance and Risk Monitoring Procedures.md",
+    "[RSK-029] Legal Risk and AML Strategy 2026 Overview.md",
+    "[RSK-043] Risk and Compliance Strategy Update 2026.md",
+    "[RSK-061] Risk Strategy 2026 Updates and Reviews.md"
+  ],
+  "it_and_operations_aml_extra_basenames": [
+    "[RSK-007] AML Detection Standard Update and Regulatory Review.md",
+    "[RSK-010] AML Detection Standard Implementation and Branch Monitoring.md"
+  ],
+  "auditee_audit_report_basenames_by_department": {
+    "Credit & Loans": [],
+    "HR & Admin": [],
+    "IT & Digital": [],
+    "Operations": []
+  },
+  "explicit_cross_deny_basenames": [
+    "[AUD-001] Internal_Audit_Mobile_Banking_Fraud.md",
+    "[RSK-012] Fraud Analysis and Risk Management Review.md"
+  ],
+  "deny_substrings_in_basename_case_insensitive": [
+    "Audit Report",
+    "Audit Findings",
+    "Internal Control Review",
+    "Memo",
+    "Fraud Analysis",
+    "Fraud Investigation"
+  ]
+}

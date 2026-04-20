@@ -10,7 +10,7 @@
 > *"An LLM is the CPU of an emerging operating system."* — **Andrej Karpathy**
 
 ### 💡 Inspiration: Standing on the Shoulders of Giants
-This project exists because of **Andrej Karpathy's** brilliant vision of the "LLM OS". He proposed that an LLM shouldn't just be a chatbot, but the core processor of a new operating system—capable of reading files, managing memory, and respecting user permissions natively. 
+This project exists because of **Andrej Karpathy's** brilliant vision of the "LLM OS". He proposed that an LLM shouldn't just be a chatbot, but the core processor of a new operating system—capable of reading files, managing memory, and respecting user permissions natively.
 
 While the AI industry rushed to dump enterprise data into complex, multi-million dollar, black-box Vector Databases, they forgot the fundamental requirement of any Operating System: **A deterministic, permission-aware File System.**
 
@@ -27,7 +27,7 @@ I am not looking for profit or a commercial software license. My only objective 
 
 **The theory is proven. The foundation is here.**
 
-This repository is provided as an open-source foundation. You are free to take this architecture, adapt it, integrate it with your enterprise's complex RBAC (Active Directory, OAuth, etc.), and scale it for your own needs. 
+This repository is provided as an open-source foundation. You are free to take this architecture, adapt it, integrate it with your enterprise's complex RBAC (Active Directory, OAuth, etc.), and scale it for your own needs.
 
 *The framework is public. The proof is undeniable. The implementation is now yours.*
 
@@ -62,6 +62,7 @@ We got so obsessed with shiny Vector DBs and complex embeddings that we forgot b
 - **Multi-threaded Speed:** Parallel worker agents (optimized swarm) scout the vault in milliseconds.
 - **Industrial Resilience:** Integrated safety cut (circuit breaker) and industrial operational watchdog.
 - **Demo Audit Layer:** AI-on-AI QC judging and performance dashboard (built for continuous improvement).
+- **Layered cross-silo access for VPs:** Department Heads can receive *merged* silo search scope with per-file policies (whitelist / deny / substring rules) — see **§ Organization model** below.
 
 ---
 
@@ -92,14 +93,144 @@ Once pushed, content is **copied forever** across forks, clones, and search inde
 
 ---
 
-## 🛠️ Tech Stack & Quick Start
+## 👥 Getting the code (evaluators, testers, forks)
 
-### Option A — Docker (recommended)
+You can download and run this project **without being the maintainer**.
+
+| Method | What to do |
+| :--- | :--- |
+| **Git clone** | `git clone https://github.com/tong-mini-mac/RAG-Destroyer.git` then follow **§ Quick start** below. |
+| **ZIP** | On GitHub: **Code → Download ZIP**, extract, then open a terminal in that folder. |
+
+### What testers and evaluators should know
+
+Tell anyone trying the demo the following:
+
+1. **There is no `knowledge/` vault inside the repo.** It is **gitignored** on purpose (**privacy policy** — see **Data Privacy & GitHub Policy** above). After `git clone` or unzipping, **you must supply Markdown yourself**: build **`knowledge/<Department>/`** to match **`config/org_structure.json`**, **or** copy from the repo’s **`demo_knowledge/`** into **`knowledge/`** as described in this README (**same folder names as department silos**).
+
+2. **Automatic demo seed (optional):** If **`knowledge/`** has **no** `.md` files yet and **`demo_knowledge/`** exists next to the app, **`maybe_seed_demo_vault`** (`core/Utils.py`) may copy **`demo_knowledge/` → `knowledge/`** on startup. Create **`knowledge/.no_auto_demo`** to disable that behaviour.
+
+3. **API keys (BYOK):** Bring **your own** LLM credentials. Enter them in the Streamlit UI or **`config/.env`** (see **Quick start §2** and **`config/.env.example`**).
+
+4. **Repository access:** If this GitHub repo is **public**, anyone can clone or download the ZIP. If it is **private**, only **invited users** or accounts **granted access** can clone or pull.
+
+**In short:** testers get the **code** via **`git clone`** or **ZIP**. Whether that works **without extra GitHub login** depends on **public vs private**. They always need to **prepare a vault under `knowledge/`** (manually, from **`demo_knowledge/`**, or via **auto-seed**) and **their own API key**.
+
+---
+
+## 🏢 Organization model: silos, roles (CEO → Operational Staff), and cross-merge
+
+The **subset** enforced at query time uses `config/org_structure.json`, `core/Utils.py` (`document_visible_to_viewer`), YAML `audience` in front matter (e.g. `management`), and optional config files listed below.
+
+### Department silos (folder names under `knowledge/`)
+
+These must match the `name` field for each department in **`config/org_structure.json`**.
+
+| Silo | Code | Focus |
+|------|------|--------|
+| **General** | GEN | Company-wide / HQ policies |
+| **Credit & Loans** | CRL | Lending |
+| **Operations** | OPS | Branches / operations |
+| **IT & Digital** | ITD | Technology & digital |
+| **HR & Admin** | HRA | HR & admin |
+| **Risk & Compliance** | RSK | Risk & compliance |
+
+### Role → search scope (vault)
+
+| Role | Search scope | Notes |
+|------|----------------|-------|
+| **CEO** | **ALL** silos | Full vault; still respects YAML `audience` when set. |
+| **CFO** | **Credit & Loans**, **Risk & Compliance**, **General** | Fixed list in `org_structure.json`. |
+| **CTO** | **IT & Digital**, **Operations**, **General** | Fixed list in `org_structure.json`. |
+| **Department Head (VP)** | **Selected department + General** (`subset_include_general: true`) **plus merged silos** (see below) **and** per-file filtering. |
+| **Operational Staff** | **Selected department only** (no General by default) | Extra per-department **denylist** in `config/operational_staff_vault_denylist.json`. |
+
+Operational Staff (and roles with a single silo) **do not** see `audience: management` documents unless the role is treated as management in code.
+
+### Cross-silo merge (Department Head only)
+
+For **Department Head (VP)** the app expands the allowed folder list **after** `[department, General]` using, **in order**:
+
+1. `merge_credit_cross_access_subset` → `config/credit_head_cross_access.json`
+2. `merge_hr_cross_access_subset` → `config/hr_head_cross_access.json`
+3. `merge_it_cross_access_subset` → `config/it_head_cross_access.json`
+4. `merge_ops_cross_access_subset` → `config/ops_head_cross_access.json`
+5. `merge_risk_silo_cross_access_subset` → `config/risk_silo_cross_access.json`
+
+Each step **appends** a silo folder name when the viewer’s active department is in that config’s merge list **and is not** the silo owner (no duplicate append). **CEO / CFO / CTO** paths that are already `ALL` or fixed lists **do not** use this merge chain.
+
+**Search** still applies **`document_visible_to_viewer`** per file (whitelist, explicit deny, substring rules, Risk/HR/Ops extras, universal-read basenames, auditee audit-report lists, etc.).
+
+| If the Head’s active department is… | Extra silo merged in (when not already that silo) | Mechanism (high level) |
+|-------------------------------------|---------------------------------------------------|-------------------------|
+| Not **Credit & Loans** | **Credit & Loans** | Credit policy/strategy allowlists; Operations gets extra basenames per `credit_head_cross_access.json`. |
+| Not **HR & Admin** | **HR & Admin** | Whitelist + explicit deny (`hr_head_cross_access.json`). |
+| Not **IT & Digital** | **IT & Digital** | Whitelist + Risk-only extras + substring deny on basenames (`it_head_cross_access.json`). |
+| Not **Operations** | **Operations** | Whitelist + HR substring / Risk expansion + denies (`ops_head_cross_access.json`). |
+| Not **Risk & Compliance** | **Risk & Compliance** | Whitelist + IT/Ops AML extras + optional auditee reports per department (`risk_silo_cross_access.json`). |
+
+### Related config files
+
+| File | Purpose |
+|------|---------|
+| `config/org_structure.json` | Departments & base role access. |
+| `config/universal_read_basenames.json` | Basenames readable across allowed silos (extra visibility rules). |
+| `config/credit_head_cross_access.json` | Merge Credit + policy/strategy file lists. |
+| `config/hr_head_cross_access.json` | Merge HR + cross-read rules. |
+| `config/it_head_cross_access.json` | Merge IT + Risk-only extras + deny patterns. |
+| `config/ops_head_cross_access.json` | Merge Operations + HR/Risk extensions. |
+| `config/risk_silo_cross_access.json` | Merge Risk + AML/auditee rules. |
+| `config/operational_staff_vault_denylist.json` | Blocks specific basenames for Operational Staff by silo. |
+
+### Index & regression
+
+- After bulk changes under `knowledge/`, use **🛠️ System Config → Rebuild vault index & search cache** (`_SEARCH_CACHE.json`, `_MASTER_INDEX.md`).
+- Example script for merge scope: `scripts/test_merge_cross_silo.py`.
+
+---
+
+## 🛠️ Quick start & operations
+
+**In this section:** (1) two-folder layout & subset rules → (2) first-time steps 1–6 → (3) production checklist → (4) env/CLI notes → (5) tech reference.
+
+---
+
+### 1) Two folders, subsets, and where `.md` comes from
+
+Everything below uses defaults from `core/Utils.py`. Override paths with environment variables or **🛠️ System Config** in the app.
+
+| Layer | Path (default) | Config key | What it is |
+| :--- | :--- | :--- | :--- |
+| **Raw** | `raw_data/` | `RAW_DATA_PATH` | Drop unstructured files here first. |
+| **Cleaned** | `knowledge/` | `CLEANED_DATA_PATH` | The **only** tree GURU indexes—your “cleaned data” vault (name can stay `knowledge/`). |
+
+**Automated pipeline (raw → cleaned)**  
+With Streamlit running, the **background monitor** watches `raw_data/`. **`DataRefinery`** calls your **LLM** to classify content, suggest a filename, and write **Markdown + YAML front matter** straight into **`knowledge/<Department>/`**. No second staging folder. **Obsidian does not run this step** and never receives raw drops.
+
+**Subset (who sees what)**  
+“Subset” is enforced at **query time** in Python: allowed **department folders** under `knowledge/`, using `config/org_structure.json` and the role you pick in the UI (`SearchWorker` / `RAGOrchestrator`). **Department Heads** additionally get **merged silos** and **per-file RBAC** as described in **§ Organization model**. **Obsidian does not split subsets.** Optionally open `knowledge/` in Obsidian **after** files exist to edit, link, or tag—folder names must still match silos.
+
+| How `.md` gets into `knowledge/` | Details |
+| :--- | :--- |
+| **Refinery (automated)** | `raw_data/` → LLM classification → `knowledge/<Department>/` (monitor or batch `DataRefinery().scan_and_refine_all()`). |
+| **Manual** | Create/edit `.md` in VS Code, Cursor, Obsidian, etc. |
+| **Office / PDF** | Optional **[Pandoc](https://pandoc.org/installing.html)** if you use Pandoc-based flows; place output under the right silo. |
+| **Bulk import** | Copy pre-cleaned trees into `knowledge/`; department folder names must match **`org_structure.json`**. |
+
+---
+
+### 2) First-time run (steps 1–6)
+
+Do these in order for the PoC.
+
+**1. Install the codebase**
+
+**Option A — Docker (recommended)**
 
 Prerequisites: [Docker](https://docs.docker.com/get-docker/) + [Docker Compose v2](https://docs.docker.com/compose/).
 
 ```bash
-git clone https://github.com/vittaya1973/RAG-Destroyer.git
+git clone https://github.com/tong-mini-mac/RAG-Destroyer.git
 cd RAG-Destroyer
 cp config/.env.example config/.env
 # Edit config/.env — set at least GEMINI_API_KEY (or keys for the provider you select in the UI)
@@ -111,43 +242,99 @@ docker compose up --build
 Open **http://localhost:8501**
 
 - **Secrets:** real keys live only in `config/.env` (gitignored). Do not commit `.env`.
-- **Vault / uploads:** `knowledge/` and `raw_data/` are **bind-mounted** from your host; data persists when the container stops. Populate `knowledge/` on the host (Obsidian vault, rsync, etc.) — nothing in that folder is required inside the GitHub repo.
-- **Compose env:** `docker compose` loads `config/.env`. The file must exist (even with placeholders); create it with `cp` as above.
+- **Vault / uploads:** `knowledge/` and `raw_data/` are **bind-mounted** from your host; data persists when the container stops.
+- **Compose:** `docker compose` loads `config/.env`; create the file with `cp config/.env.example config/.env` if it does not exist yet.
 
-### Option B — Local Python
+**Option B — Local Python (same clone + pip as below)**
 
-Requires **Python 3.9+** (Dockerfile uses **3.11** for parity).
+Requires **Python 3.9+** (the included `Dockerfile` uses **3.11** for the container image).
 
 ```bash
-git clone https://github.com/vittaya1973/RAG-Destroyer.git
+git clone https://github.com/tong-mini-mac/RAG-Destroyer.git
 cd RAG-Destroyer
 pip install -r requirements.txt
-cp config/.env.example config/.env
-# Edit config/.env
-mkdir -p knowledge raw_data logs
+```
+
+Optional: create a virtual environment (`python -m venv .venv` then activate) before `pip install`. Optional: install the [Pandoc](https://pandoc.org/installing.html) binary if you rely on Pandoc-based export features (`pypandoc`).
+
+**2. Start the UI**
+
+```bash
 streamlit run app.py
 ```
 
-### Configuration (`config/.env`)
+On Windows, if you maintain a local launcher script (e.g. `start.bat`), you can use that instead—it should `cd` to this folder and run Streamlit with your venv.
 
-See `config/.env.example`. Common entries:
+**3. Connect an LLM (BYOK)**
 
-```env
-GEMINI_API_KEY=your_key_here
-GEMINI_MODEL=gemini-2.5-flash
-LINE_NOTIFY_TOKEN=Optional_Token
-```
+1. When the app opens, complete the minimal **API key** step, **or** open **🛠️ System Config** in the sidebar.
+2. Choose **Google**, **OpenAI**, or **Anthropic** and paste **your own** API key. Keys stay in the Streamlit session until you close the tab.
+3. Optional: click **Save keys to config/.env on this PC** so keys reload on the next run (`config/.env` is gitignored). See `config/.env.example`.
+
+Refinery/raw ingestion **requires** a working key—search and GURU need it too.
+
+**4. Put knowledge on disk — pick one track**
+
+| Track | When to use | What to do |
+| :--- | :--- | :--- |
+| **A — Trial / cleaned vault** | You already have (or imported) Markdown silos—e.g. demo data, Google Drive sync, manual copy | (1) Folder names under `knowledge/` must match **department `name`** fields in `config/org_structure.json`. (2) Place `.md` files with YAML front matter (`title`, `doc_id`, `tags`, `summary`, …) under `knowledge/<Department>/`. **Obsidian is not required** if files are already there—you can edit with VS Code/Cursor/Obsidian. |
+| **B — Raw → cleaned Markdown (automated)** | You have unstructured drops (txt, pasted exports, …) | (1) Ensure step 3 is done—**DataRefinery** calls your LLM. (2) Drop files into **`raw_data/`** (raw). (3) Keep Streamlit running: the **background monitor** writes **`.md` straight into `knowledge/<Department>/`** (cleaned). *(4) Batch alternative from project root (venv active):* `python -c "from core.Refinery import DataRefinery; DataRefinery().scan_and_refine_all()"`. |
+
+Regardless of track, **GURU only reads the cleaned vault** (`CLEANED_DATA_PATH`, default `knowledge/`).
+
+**5. Refresh indexes after bulk changes**
+
+After copying many files or changing paths, open **🛠️ System Config** → **Rebuild vault index & search cache** so `_SEARCH_CACHE.json` / `_MASTER_INDEX.md` stay accurate.
+
+**6. Query with GURU**
+
+Open **🧠 GURU Assistant**, choose **role** and **department**, confirm the **document preview table** matches your simulated access, then ask your question in the chat box.
+
+---
+
+### 3) Production checklist
+
+Use when “trial data” becomes real content. This repo stays a PoC—you own security, deployment, and governance.
+
+1. **Secrets** — Store keys in **`config/.env`** (gitignored), a vault, or your cloud secret manager—never in git. Restrict OS permissions on that file. Rotate API keys per policy.
+2. **Vault matches the org model** — Keep **`knowledge/<Department>/`** folder names aligned with **`config/org_structure.json`**. Remember: **filesystem permissions** on those folders are the practical access boundary; sidebar “roles” only **simulate** RBAC inside the demo UI.
+3. **Ingestion governance** — Define who may write to **`raw_data/`**. Review **`DataRefinery`** output—the LLM can mis-label a department. After bulk imports or path changes, run **Rebuild vault index & search cache** (System Config). Optionally add a human QA step before treating new `.md` as authoritative.
+4. **Paths & hosting** — Set **Raw data** / **Knowledge vault** paths in **System Config** when the vault lives on another drive or share. Run Streamlit **locally**, **behind VPN**, or in a **container / VM** as appropriate; put a **reverse proxy + TLS** in front if exposing beyond localhost.
+5. **Monitoring** — Set **`LINE_NOTIFY_TOKEN`** in `.env` if you rely on LINE alerts from the watchdog/monitor paths; verify notifications in lower environments first.
+6. **Backups** — Schedule backups of **`knowledge/`**, **`config/`**, and **`logs/`** (and audit artifacts) independently of `git clone`.
+7. **Models & spend** — Pin **`GEMINI_MODEL`** / provider equivalents in `.env`; track provider billing and quotas.
+8. **Editorial workflow** — For teams maintaining Markdown at scale, standardize on **Obsidian**, **Git**, or internal CMS export into `knowledge/`—pick one workflow and document it for authors.
+
+Complete **steps 1–6** first; then apply this checklist as needed.
+
+---
+
+### Obsidian (optional reminder)
+
+- **Trial with pre-cleaned Markdown:** Obsidian **not required**—the app only reads files on disk.
+- **Ongoing editing:** Many teams open `knowledge/` as an [Obsidian](https://obsidian.md/) vault for links/tags/graph; others use VS Code/Cursor. `.obsidian/` remains gitignored.
+
+### 4) Configuration extras (CLI / persistence)
+
+You do **not** need `config/.env` to open the UI—see **§2 step 3** above for BYOK.
+
+- Copy `config/.env.example` → `config/.env` and fill variables, **or** use **Save keys to config/.env on this PC** in the app (`config/.env` is gitignored).
+- For **CLI / scripts** without Streamlit, set `RAGD_PRIMARY_PROVIDER` to `google`, `openai`, or `anthropic` (same values the in-app save button writes) so the correct API key is read.
+
+### 5) Tech reference
 
 | Category | Technology | Purpose |
 | :--- | :--- | :--- |
-| **Packaging** | `Docker` + Compose | Reproducible runtime; host-mounted vault |
-| **Orchestration** | `Python 3.9+` (3.11 in Docker) | Core control logic |
-| **Logic Layer** | `Gemini 2.5 Flash` (+ optional providers in UI) | Query interpretation & response synthesis |
-| **Storage** | `Obsidian (Markdown)` in `knowledge/` | Distributed knowledge vault (local/private) |
+| **Packaging** | `Docker` + Compose | Optional reproducible runtime; bind-mount `knowledge/` and `raw_data/` from the host |
+| **Orchestration** | `Python 3.9+` (3.11 in Docker image) | Core control logic |
+| **Logic Layer** | `Gemini 2.5 Flash` (+ OpenAI / Anthropic optional in UI) | Query interpretation & response synthesis |
+| **Storage** | Markdown vault (`knowledge/`, Obsidian-compatible) | Distributed silos on disk |
 | **UI Framework** | `Streamlit` | Enterprise Guru dashboard |
 | **Resilience** | `Industrial Watchdog` | PID lock, auto-recovery, optional LINE Notify |
 
 ---
 
-**Built with respect for the craft.**  
+**Built with respect for the craft.**
 *Architected by RAG Slayer (Bangkok, Thailand).*
+
+*PS: https://www.linkedin.com/in/vittaya-lertbuiasin-13b258149/*

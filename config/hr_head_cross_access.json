@@ -1,0 +1,26 @@
+{
+  "merge_hr_for_heads_of": [
+    "Credit & Loans",
+    "IT & Digital",
+    "Operations",
+    "Risk & Compliance"
+  ],
+  "allowed_cross_basenames": [
+    "demo_hr_leave.md",
+    "[HRP-001] Employee_Bonus_Policy_BE2567.md",
+    "[HRA-063] Career Development and Bonus Structure Update Policy.md",
+    "[HRA-072] HR Bonus and Leave Policy Update.md",
+    "[HRA-089] Employee Welfare and Benefits Policy Updates.md",
+    "[HRA-016] HR Admin Career Development and Leave Monitoring Guidelines.md",
+    "[HRA-094] HR Policy Updates and Performance Review Adjustments 2026.md",
+    "[HRA-064] HR Annual Planning and Review 2026.md",
+    "[HRA-088] HR_Workforce_Management_Review.md"
+  ],
+  "explicit_cross_deny_basenames": [
+    "[HRA-031] HR Payroll and Employee Management Summary.md",
+    "[HRA-084] HR Admin Payroll and Employee Benefits Summary.md",
+    "[HRA-014] HR Admin Audit and Monitoring Tasks.md",
+    "[HRA-093] HR_Admin_Action_Items_Summary.md",
+    "[HRA-004] HR Policy Review and Update Tasks.md"
+  ]
+}

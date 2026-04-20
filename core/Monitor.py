@@ -1,11 +1,35 @@
 import time
 import os
+import sys
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from .Refinery import DataRefinery
 from .Utils import CONFIG, NotificationManager
 import signal
-import sys
+
+
+def _pid_alive(pid):
+    """True if pid is a running process. os.kill(pid, 0) is unreliable on Windows (WinError 11)."""
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            kernel32 = ctypes.windll.kernel32
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        except OSError:
+            return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
 
 class RawDataHandler(FileSystemEventHandler):
     def __init__(self, refinery, department="General"):
@@ -43,13 +67,16 @@ class BackgroundMonitor:
                 # Check if process is still running and NOT the current process
                 if old_pid == os.getpid():
                     return
-                
-                os.kill(old_pid, 0)
-                print(f"🧹 Zombie Cleanup: Killing existing Monitor (PID {old_pid})")
-                os.kill(old_pid, signal.SIGTERM)
-                time.sleep(1) # Allow time for cleanup
+
+                if _pid_alive(old_pid):
+                    print(f"🧹 Zombie Cleanup: Killing existing Monitor (PID {old_pid})")
+                    try:
+                        os.kill(old_pid, signal.SIGTERM)
+                    except OSError:
+                        pass
+                    time.sleep(1)  # Allow time for cleanup
             except (ProcessLookupError, ValueError):
-                pass # Process doesn't exist
+                pass  # Stale pid file or invalid content
             finally:
                 if os.path.exists(self.pid_file):
                     os.remove(self.pid_file)
