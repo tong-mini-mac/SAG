@@ -95,11 +95,11 @@ class BackgroundMonitor:
         
         start_msg = f"👀 Monitor started on: {self.watch_path} (PID: {os.getpid()})"
         print(start_msg)
-        self.notifier.send_line(f"🚀 RAG-Destroyer Monitor Active\n{start_msg}")
+        self.notifier.send_line(f"🚀 SAG Monitor Active\n{start_msg}")
 
     def stop(self):
         self.observer.stop()
         self.observer.join()
         if os.path.exists(self.pid_file):
             os.remove(self.pid_file)
-        self.notifier.send_line("🛑 RAG-Destroyer Monitor Stopped.")
+        self.notifier.send_line("🛑 SAG Monitor Stopped.")

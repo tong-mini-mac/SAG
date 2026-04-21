@@ -1,5 +1,5 @@
-# RAG-Destroyer — Streamlit UI + zero-vector-db workers
-# https://github.com/vittaya1973/RAG-Destroyer
+# SAG — Streamlit UI + zero-vector-db workers
+# https://github.com/tong-mini-mac/SAG
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

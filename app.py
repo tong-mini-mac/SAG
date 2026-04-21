@@ -61,7 +61,7 @@ def _write_config_dotenv():
     om = (st.session_state.get("openai_model") or CONFIG.get("OPENAI_MODEL") or "gpt-4o").strip()
     am = (st.session_state.get("anthropic_model") or CONFIG.get("ANTHROPIC_MODEL") or "claude-3-5-sonnet-20240620").strip()
     lines = [
-        "# Written from RAG-Destroyer — do not commit.",
+        "# Written from SAG — do not commit.",
         f"RAGD_PRIMARY_PROVIDER={_rp}",
         f"GEMINI_MODEL={gm}",
         f"OPENAI_MODEL={om}",
@@ -99,7 +99,7 @@ def _provider_key_ready():
 
 
 # Page Config
-st.set_page_config(page_title="RAG-Destroyer Industrial", page_icon="🏛️", layout="wide")
+st.set_page_config(page_title="SAG Industrial", page_icon="🏛️", layout="wide")
 
 # Persistent Session Defaults for Multi-LLM
 if "selected_provider" not in st.session_state:
@@ -293,7 +293,7 @@ elif page == "🧠 GURU Assistant":
         st.warning("Add your API key on **🔑 Start** first.")
         st.stop()
 
-    st.title("🏛️ RAG-Destroyer: Financial Org Simulation")
+    st.title("🏛️ SAG: Financial Org Simulation")
 
     with st.expander("API & model", expanded=False):
         render_api_and_model_form(compact=True, key_prefix="guru_exp")

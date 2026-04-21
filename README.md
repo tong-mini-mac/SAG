@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="docs/img/architecture.png" width="100%" alt="RAG-Destroyer: Obsidian Graph x Subset Architecture">
-  <h1>🏛️ RAG-Destroyer: The Zero-Vector-DB Architecture</h1>
+  <img src="docs/img/architecture.png" width="100%" alt="SAG: Obsidian Graph x Subset Architecture">
+  <h1>🏛️ SAG (Subset-Augmented Generation): The Zero-Vector-DB Architecture</h1>
   <p><b>Deterministic Knowledge Retrieval for the LLM OS Era</b></p>
   <p><i>Repository documentation is maintained in English.</i></p>
 </div>
@@ -14,14 +14,14 @@ This project exists because of **Andrej Karpathy's** brilliant vision of the "LL
 
 While the AI industry rushed to dump enterprise data into complex, multi-million dollar, black-box Vector Databases, they forgot the fundamental requirement of any Operating System: **A deterministic, permission-aware File System.**
 
-**RAG-Destroyer** (nickname *Lom RAG*: a Thai shorthand for pushing back on naive "dump everything into vectors" RAG) is my humble attempt to build that missing layer.
+**SAG (Subset-Augmented Generation)** is my practical implementation of that missing layer.
 
 ---
 
 ## 🧪 Proving the Theory: A Manifesto for GURU in the Box
 **This project was built to prove a theory, not to be sold as a commercial product.**
 
-The goal of **RAG-Destroyer** is to serve as a **Proof of Concept (PoC)** to demonstrate a singular truth: *A deterministic, Zero-Vector-DB architecture using the "Subset Theory" can eliminate Data Leakage and Hallucination in high-security environments.*
+The goal of **SAG (Subset-Augmented Generation)** is to serve as a **Proof of Concept (PoC)** to demonstrate a singular truth: *A deterministic, Zero-Vector-DB architecture using the "Subset Theory" can eliminate data leakage and hallucination in high-security environments.*
 
 I am not looking for profit or a commercial software license. My only objective was to prove that this architectural approach—the anti-vector-overkill philosophy described above—is the correct foundation for enterprise-grade AI security.
 
@@ -63,6 +63,8 @@ We got so obsessed with shiny Vector DBs and complex embeddings that we forgot b
 - **Industrial Resilience:** Integrated safety cut (circuit breaker) and industrial operational watchdog.
 - **Demo Audit Layer:** AI-on-AI QC judging and performance dashboard (built for continuous improvement).
 - **Layered cross-silo access for VPs:** Department Heads can receive *merged* silo search scope with per-file policies (whitelist / deny / substring rules) — see **§ Organization model** below.
+- **Identity-first question drafting:** GURU shows a role-scoped document preview table before prompting, so users can draft questions from only the documents they are authorized to see.
+- **Ops alert relay:** Optional LINE and Discord webhook notifications for critical runtime/API failures.
 
 ---
 
@@ -86,7 +88,7 @@ Once pushed, content is **copied forever** across forks, clones, and search inde
 **If you truly need Git-backed vaults:**
 
 - **Private repository** (org-only) + branch protections — still treat as sensitive; rotate anything that ever leaked to a public remote by mistake.
-- **Separate private repo** for `knowledge/` only (or Git submodule) so the public RAG-Destroyer repo stays code-only.
+- **Separate private repo** for `knowledge/` only (or Git submodule) so the public SAG repo stays code-only.
 - **No Git at all for vault:** keep `knowledge/` on disk, NAS, S3, or Google Drive — the **Docker Compose** setup bind-mounts `./knowledge` and `./raw_data` from the host; the container never required the vault to live inside the image.
 
 **Google Drive / local paths:** Never commit machine-specific absolute paths or synced folders that contain private files.
@@ -99,7 +101,7 @@ You can download and run this project **without being the maintainer**.
 
 | Method | What to do |
 | :--- | :--- |
-| **Git clone** | `git clone https://github.com/tong-mini-mac/RAG-Destroyer.git` then follow **§ Quick start** below. |
+| **Git clone** | `git clone https://github.com/tong-mini-mac/SAG.git` then follow **§ Quick start** below. |
 | **ZIP** | On GitHub: **Code → Download ZIP**, extract, then open a terminal in that folder. |
 
 ### What testers and evaluators should know
@@ -230,8 +232,8 @@ Do these in order for the PoC.
 Prerequisites: [Docker](https://docs.docker.com/get-docker/) + [Docker Compose v2](https://docs.docker.com/compose/).
 
 ```bash
-git clone https://github.com/tong-mini-mac/RAG-Destroyer.git
-cd RAG-Destroyer
+git clone https://github.com/tong-mini-mac/SAG.git
+cd SAG
 cp config/.env.example config/.env
 # Edit config/.env — set at least GEMINI_API_KEY (or keys for the provider you select in the UI)
 
@@ -250,8 +252,8 @@ Open **http://localhost:8501**
 Requires **Python 3.9+** (the included `Dockerfile` uses **3.11** for the container image).
 
 ```bash
-git clone https://github.com/tong-mini-mac/RAG-Destroyer.git
-cd RAG-Destroyer
+git clone https://github.com/tong-mini-mac/SAG.git
+cd SAG
 pip install -r requirements.txt
 ```
 
@@ -290,6 +292,17 @@ After copying many files or changing paths, open **🛠️ System Config** → *
 
 Open **🧠 GURU Assistant**, choose **role** and **department**, confirm the **document preview table** matches your simulated access, then ask your question in the chat box.
 
+### 2.1) Role-scoped preview flow (recommended)
+
+To avoid cross-silo confusion and improve answer precision:
+
+1. Select **Identity Simulation (role)** and, when needed, **Active Department**.
+2. Review **Documents available to this identity (for drafting questions)**.
+3. Draft your question from those visible titles / topics.
+4. Run GURU query and verify sources in **View Authorized Sources**.
+
+This is the intended "subset-first" operating pattern for the demo.
+
 ---
 
 ### 3) Production checklist
@@ -319,7 +332,10 @@ Complete **steps 1–6** first; then apply this checklist as needed.
 You do **not** need `config/.env` to open the UI—see **§2 step 3** above for BYOK.
 
 - Copy `config/.env.example` → `config/.env` and fill variables, **or** use **Save keys to config/.env on this PC** in the app (`config/.env` is gitignored).
-- For **CLI / scripts** without Streamlit, set `RAGD_PRIMARY_PROVIDER` to `google`, `openai`, or `anthropic` (same values the in-app save button writes) so the correct API key is read.
+- For **CLI / scripts** without Streamlit, set `SAG_PRIMARY_PROVIDER` to `google`, `openai`, or `anthropic` (same values the in-app save button writes) so the correct API key is read.
+- Optional notifications:
+  - `LINE_NOTIFY_TOKEN=...`
+  - `DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...`
 
 ### 5) Tech reference
 
@@ -335,6 +351,6 @@ You do **not** need `config/.env` to open the UI—see **§2 step 3** above for 
 ---
 
 **Built with respect for the craft.**
-*Architected by RAG Slayer (Bangkok, Thailand).*
+*Architected by SAG Builder (Bangkok, Thailand).*
 
 *PS: https://www.linkedin.com/in/vittaya-lertbuiasin-13b258149/*

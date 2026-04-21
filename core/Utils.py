@@ -737,7 +737,7 @@ def safe_ai_call(func, *args, max_retries=3, **kwargs):
                 print(msg)
                 # Send critical notification
                 notifier = NotificationManager()
-                notifier.send_ops(f"🚨 RAG-Destroyer Critical Error:\n{e}")
+                notifier.send_ops(f"🚨 SAG Critical Error:\n{e}")
                 raise e
     return None
 
@@ -826,16 +826,17 @@ class LLMInterface:
             
             return LLMFactory.get_client(provider, key, model)
         except Exception:
-            # CLI / scripts / threads: no Streamlit session — pick provider via RAGD_PRIMARY_PROVIDER
-            p = (os.getenv("RAGD_PRIMARY_PROVIDER") or "google").strip().lower()
+            # CLI / scripts / threads: no Streamlit session — pick provider via SAG_PRIMARY_PROVIDER
+            p = (os.getenv("SAG_PRIMARY_PROVIDER") or os.getenv("RAGD_PRIMARY_PROVIDER") or "google").strip().lower()
             if p in ("openai", "gpt"):
                 key = CONFIG.get("OPENAI_API_KEY")
-                model = os.getenv("OPENAI_MODEL") or os.getenv("RAGD_OPENAI_MODEL") or "gpt-4o"
+                model = os.getenv("OPENAI_MODEL") or os.getenv("SAG_OPENAI_MODEL") or os.getenv("RAGD_OPENAI_MODEL") or "gpt-4o"
                 return LLMFactory.get_client("OpenAI", key, model)
             if p in ("anthropic", "claude"):
                 key = CONFIG.get("ANTHROPIC_API_KEY")
                 model = (
                     os.getenv("ANTHROPIC_MODEL")
+                    or os.getenv("SAG_ANTHROPIC_MODEL")
                     or os.getenv("RAGD_ANTHROPIC_MODEL")
                     or "claude-3-5-sonnet-20240620"
                 )

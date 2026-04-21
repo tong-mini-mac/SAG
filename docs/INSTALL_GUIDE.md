@@ -1,8 +1,8 @@
-# 🛠️ RAG-Destroyer: Installation & Setup Guide
+# 🛠️ SAG: Installation & Setup Guide
 
 *This guide is written in English.*
 
-Welcome to the **Industrial RAG-Destroyer (Zero-Vector-DB)**. This guide will help you set up the system from scratch in less than 5 minutes.
+Welcome to **SAG (Subset-Augmented Generation)**. This guide will help you set up the system from scratch in less than 5 minutes.
 
 ---
 
@@ -16,8 +16,8 @@ Welcome to the **Industrial RAG-Destroyer (Zero-Vector-DB)**. This guide will he
 
 ## 🚀 Step 1: Clone & Install
 ```bash
-git clone https://github.com/tong-mini-mac/RAG-Destroyer.git
-cd RAG-Destroyer
+git clone https://github.com/tong-mini-mac/SAG.git
+cd SAG
 pip install -r requirements.txt
 ```
 
@@ -30,7 +30,7 @@ Start the app first — **no `config/.env` is required** for a quick trial.
 When the UI is open, go to **🛠️ System Config**.
 
 ### 1. Link your AI provider (BYOK)
-RAG-Destroyer supports multiple providers. Select one and paste **your own** API key (keys stay in this browser session unless you choose **Save keys to config/.env**):
+SAG supports multiple providers. Select one and paste **your own** API key (keys stay in this browser session unless you choose **Save keys to config/.env**):
 
 - **Google Gemini** (recommended for speed/cost)
 - **OpenAI GPT-4o**

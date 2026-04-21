@@ -40,7 +40,7 @@ class RAGOrchestrator:
     def generate_keywords(self, query):
         """AI Call 1: Strictly generates keywords from the command to save API costs."""
         system_instruction = """
-        You are the 'RAG-Destroyer Semantic Swarm Engine'.
+        You are the 'SAG Semantic Swarm Engine'.
         Your goal is to ensure high RECALL for a deterministic substring search over English policy metadata (titles, tags, summaries).
 
         1. Analyze the user query (any language).
