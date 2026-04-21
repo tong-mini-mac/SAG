@@ -300,7 +300,7 @@ Use when “trial data” becomes real content. This repo stays a PoC—you own 
 2. **Vault matches the org model** — Keep **`knowledge/<Department>/`** folder names aligned with **`config/org_structure.json`**. Remember: **filesystem permissions** on those folders are the practical access boundary; sidebar “roles” only **simulate** RBAC inside the demo UI.
 3. **Ingestion governance** — Define who may write to **`raw_data/`**. Review **`DataRefinery`** output—the LLM can mis-label a department. After bulk imports or path changes, run **Rebuild vault index & search cache** (System Config). Optionally add a human QA step before treating new `.md` as authoritative.
 4. **Paths & hosting** — Set **Raw data** / **Knowledge vault** paths in **System Config** when the vault lives on another drive or share. Run Streamlit **locally**, **behind VPN**, or in a **container / VM** as appropriate; put a **reverse proxy + TLS** in front if exposing beyond localhost.
-5. **Monitoring** — Set **`LINE_NOTIFY_TOKEN`** in `.env` if you rely on LINE alerts from the watchdog/monitor paths; verify notifications in lower environments first.
+5. **Monitoring** — Set **`LINE_NOTIFY_TOKEN`** and/or **`DISCORD_WEBHOOK_URL`** in `.env` if you rely on ops alerts from watchdog/monitor paths; verify notifications in lower environments first.
 6. **Backups** — Schedule backups of **`knowledge/`**, **`config/`**, and **`logs/`** (and audit artifacts) independently of `git clone`.
 7. **Models & spend** — Pin **`GEMINI_MODEL`** / provider equivalents in `.env`; track provider billing and quotas.
 8. **Editorial workflow** — For teams maintaining Markdown at scale, standardize on **Obsidian**, **Git**, or internal CMS export into `knowledge/`—pick one workflow and document it for authors.
@@ -330,7 +330,7 @@ You do **not** need `config/.env` to open the UI—see **§2 step 3** above for 
 | **Logic Layer** | `Gemini 2.5 Flash` (+ OpenAI / Anthropic optional in UI) | Query interpretation & response synthesis |
 | **Storage** | Markdown vault (`knowledge/`, Obsidian-compatible) | Distributed silos on disk |
 | **UI Framework** | `Streamlit` | Enterprise Guru dashboard |
-| **Resilience** | `Industrial Watchdog` | PID lock, auto-recovery, optional LINE Notify |
+| **Resilience** | `Industrial Watchdog` | PID lock, auto-recovery, optional LINE/Discord alerts |
 
 ---
 

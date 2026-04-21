@@ -71,6 +71,7 @@ def _write_config_dotenv():
     o = (st.session_state.get("openai_api_key") or "").strip()
     a = (st.session_state.get("anthropic_api_key") or "").strip()
     ln = (st.session_state.get("line_notify_token") or "").strip()
+    dw = (st.session_state.get("discord_webhook_url") or "").strip()
     if g:
         lines.append(f"GEMINI_API_KEY={g}")
     if o:
@@ -79,6 +80,8 @@ def _write_config_dotenv():
         lines.append(f"ANTHROPIC_API_KEY={a}")
     if ln:
         lines.append(f"LINE_NOTIFY_TOKEN={ln}")
+    if dw:
+        lines.append(f"DISCORD_WEBHOOK_URL={dw}")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     return path
@@ -109,6 +112,8 @@ if "anthropic_api_key" not in st.session_state:
     st.session_state.anthropic_api_key = CONFIG.get("ANTHROPIC_API_KEY", "")
 if "line_notify_token" not in st.session_state:
     st.session_state.line_notify_token = CONFIG.get("LINE_NOTIFY_TOKEN") or ""
+if "discord_webhook_url" not in st.session_state:
+    st.session_state.discord_webhook_url = CONFIG.get("DISCORD_WEBHOOK_URL") or ""
 if "gemini_model" not in st.session_state:
     st.session_state.gemini_model = CONFIG.get("GEMINI_MODEL") or "gemini-2.5-flash"
 if "openai_model" not in st.session_state:
@@ -185,6 +190,12 @@ def render_api_and_model_form(*, compact: bool = False, key_prefix: str = "gate"
             type="password",
             key="cfg_line",
         )
+        st.session_state.discord_webhook_url = st.text_input(
+            "Discord Webhook (optional)",
+            value=st.session_state.discord_webhook_url,
+            type="password",
+            key="cfg_discord",
+        )
         c_save, c_clear = st.columns(2)
         with c_save:
             if st.button("Save to config/.env", key="cfg_save_env"):
@@ -196,6 +207,7 @@ def render_api_and_model_form(*, compact: bool = False, key_prefix: str = "gate"
                 st.session_state.openai_api_key = ""
                 st.session_state.anthropic_api_key = ""
                 st.session_state.line_notify_token = ""
+                st.session_state.discord_webhook_url = ""
                 get_services.clear()
                 st.rerun()
 

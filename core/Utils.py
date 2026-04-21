@@ -36,6 +36,7 @@ def load_env_config():
         "CLEANED_DATA_PATH": os.getenv("CLEANED_DATA_PATH", os.path.join(ROOT_PATH, "knowledge")),
         "ORG_STRUCTURE_PATH": os.path.join(ROOT_PATH, "config", "org_structure.json"),
         "LINE_NOTIFY_TOKEN": os.getenv("LINE_NOTIFY_TOKEN"),
+        "DISCORD_WEBHOOK_URL": os.getenv("DISCORD_WEBHOOK_URL"),
         "AUDIT_LOG_PATH": os.path.join(ROOT_PATH, "logs", "accuracy_audit.json")
     }
 
@@ -736,15 +737,16 @@ def safe_ai_call(func, *args, max_retries=3, **kwargs):
                 print(msg)
                 # Send critical notification
                 notifier = NotificationManager()
-                notifier.send_line(f"🚨 RAG-Destroyer Critical Error:\n{e}")
+                notifier.send_ops(f"🚨 RAG-Destroyer Critical Error:\n{e}")
                 raise e
     return None
 
 class NotificationManager:
-    """Industrial-grade notification handler (LINE Notify)."""
+    """Industrial-grade notification handler (LINE + Discord webhook)."""
     def __init__(self):
         self.token = CONFIG.get("LINE_NOTIFY_TOKEN")
         self.url = "https://notify-api.line.me/api/notify"
+        self.discord_webhook = CONFIG.get("DISCORD_WEBHOOK_URL")
 
     def send_line(self, message):
         # Allow session token override
@@ -767,6 +769,32 @@ class NotificationManager:
         except Exception as e:
             print(f"⚠️ Failed to send LINE Notify: {e}")
             return False
+
+    def send_discord(self, message):
+        # Allow session override from Streamlit config page
+        try:
+            import streamlit as st
+            webhook = st.session_state.get("discord_webhook_url") or self.discord_webhook
+        except Exception:
+            webhook = self.discord_webhook
+
+        if not webhook:
+            print(f"🔕 Discord skipped (No webhook): {message}")
+            return False
+
+        try:
+            import requests
+            payload = {"content": message}
+            response = requests.post(webhook, json=payload, timeout=10)
+            return 200 <= response.status_code < 300
+        except Exception as e:
+            print(f"⚠️ Failed to send Discord webhook: {e}")
+            return False
+
+    def send_ops(self, message):
+        line_ok = self.send_line(message)
+        discord_ok = self.send_discord(message)
+        return line_ok or discord_ok
 
 def extract_json(text):
     """Extracts JSON from a string."""
