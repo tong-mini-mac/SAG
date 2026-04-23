@@ -3,9 +3,10 @@ setlocal
 title RAG-Destroyer
 cd /d "%~dp0"
 
-REM รันทุกอย่างใน CMD หน้าต้างนี้เท่านั้น — ไม่ใช้ start / ไม่สปาวน์หน้าต่างใหม่
+REM Run everything in this same CMD window only
+REM Do not use "start" and do not spawn new windows
 echo ============================================================
-echo          RAG-Destroyer ^| Streamlit UI ^(หน้าต่างเดียว^)
+echo          RAG-Destroyer ^| Streamlit UI ^(single window^)
 echo ============================================================
 echo.
 
